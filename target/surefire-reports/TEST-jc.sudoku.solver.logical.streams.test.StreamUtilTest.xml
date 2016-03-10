@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite tests="9" failures="0" name="jc.sudoku.solver.logical.streams.test.StreamUtilTest" time="0.008" errors="0" skipped="0">
+  <properties>
+    <property name="java.runtime.name" value="Java(TM) SE Runtime Environment"/>
+    <property name="sun.boot.library.path" value="D:\dev\Java\jdk1.8.0_66\jre\bin"/>
+    <property name="java.vm.version" value="25.66-b18"/>
+    <property name="java.vm.vendor" value="Oracle Corporation"/>
+    <property name="maven.multiModuleProjectDirectory" value="D:\dev\_gitrepos\SudokuSolver"/>
+    <property name="java.vendor.url" value="http://java.oracle.com/"/>
+    <property name="path.separator" value=";"/>
+    <property name="guice.disable.misplaced.annotation.check" value="true"/>
+    <property name="java.vm.name" value="Java HotSpot(TM) 64-Bit Server VM"/>
+    <property name="file.encoding.pkg" value="sun.io"/>
+    <property name="user.script" value=""/>
+    <property name="user.country" value="US"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="sun.os.patch.level" value=""/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="user.dir" value="D:\dev\_gitrepos\SudokuSolver"/>
+    <property name="java.runtime.version" value="1.8.0_66-b18"/>
+    <property name="java.awt.graphicsenv" value="sun.awt.Win32GraphicsEnvironment"/>
+    <property name="java.endorsed.dirs" value="D:\dev\Java\jdk1.8.0_66\jre\lib\endorsed"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.io.tmpdir" value="C:\Users\john\AppData\Local\Temp\"/>
+    <property name="line.separator" value="
+"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="user.variant" value=""/>
+    <property name="os.name" value="Windows 10"/>
+    <property name="classworlds.conf" value="D:\dev\Java\local\.metadata\.plugins\org.eclipse.m2e.launching\launches\m2conf6043462196731905551.tmp"/>
+    <property name="sun.jnu.encoding" value="Cp1252"/>
+    <property name="java.library.path" value="D:\dev\Java\jdk1.8.0_66\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\Program Files\Python35\Scripts\;C:\Program Files\Python35\;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\Windows Resource Kits\Tools\;C:\Program Files\Common Files\Microsoft Shared\Windows Live;C:\Program Files (x86)\Common Files\Microsoft Shared\Windows Live;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Program Files (x86)\ATI Technologies\ATI.ACE\Core-Static;C:\Program Files (x86)\Microsoft SQL Server\100\Tools\Binn\;C:\Program Files\Microsoft SQL Server\100\Tools\Binn\;C:\Program Files\Microsoft SQL Server\100\DTS\Binn\;C:\Program Files (x86)\Windows Live\Shared;C:\Program Files (x86)\Calibre2\;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files (x86)\Internet Explorer;C:\Program Files (x86)\Common Files\Acronis\SnapAPI\;C:\Users\john\AppData\Local\Smartbar\Application\;D:\dev\Java\apache-maven-3.3.3\bin;;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;D:\dev\Java\jdk1.8.0_66\db\bin;."/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="java.class.version" value="52.0"/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="os.version" value="10.0"/>
+    <property name="user.home" value="C:\Users\john"/>
+    <property name="user.timezone" value="America/New_York"/>
+    <property name="java.awt.printerjob" value="sun.awt.windows.WPrinterJob"/>
+    <property name="java.specification.version" value="1.8"/>
+    <property name="file.encoding" value="Cp1252"/>
+    <property name="user.name" value="john"/>
+    <property name="java.class.path" value="/D:/dev/Java/eclipse/plugins/org.eclipse.m2e.maven.runtime_1.6.2.20150902-0001/jars/plexus-classworlds-2.5.2.jar"/>
+    <property name="java.vm.specification.version" value="1.8"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="java.home" value="D:\dev\Java\jdk1.8.0_66\jre"/>
+    <property name="sun.java.command" value="org.codehaus.plexus.classworlds.launcher.Launcher -B clean install"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="user.language" value="en"/>
+    <property name="awt.toolkit" value="sun.awt.windows.WToolkit"/>
+    <property name="java.vm.info" value="mixed mode"/>
+    <property name="java.version" value="1.8.0_66"/>
+    <property name="java.ext.dirs" value="D:\dev\Java\jdk1.8.0_66\jre\lib\ext;C:\WINDOWS\Sun\Java\lib\ext"/>
+    <property name="sun.boot.class.path" value="D:\dev\Java\jdk1.8.0_66\jre\lib\resources.jar;D:\dev\Java\jdk1.8.0_66\jre\lib\rt.jar;D:\dev\Java\jdk1.8.0_66\jre\lib\sunrsasign.jar;D:\dev\Java\jdk1.8.0_66\jre\lib\jsse.jar;D:\dev\Java\jdk1.8.0_66\jre\lib\jce.jar;D:\dev\Java\jdk1.8.0_66\jre\lib\charsets.jar;D:\dev\Java\jdk1.8.0_66\jre\lib\jfr.jar;D:\dev\Java\jdk1.8.0_66\jre\classes"/>
+    <property name="java.vendor" value="Oracle Corporation"/>
+    <property name="maven.home" value="D:\dev\_gitrepos\SudokuSolver\EMBEDDED"/>
+    <property name="file.separator" value="\"/>
+    <property name="java.vendor.url.bug" value="http://bugreport.sun.com/bugreport/"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="sun.desktop" value="windows"/>
+    <property name="sun.cpu.isalist" value="amd64"/>
+  </properties>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testPermuteHead" time="0.002"/>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testPermuteTail" time="0.002"/>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testHead" time="0.001"/>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testTail" time="0"/>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testPermute" time="0.001"/>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testPrepend" time="0"/>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testChoose" time="0.001"/>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testConcat" time="0"/>
+  <testcase classname="jc.sudoku.solver.logical.streams.test.StreamUtilTest" name="testRemove" time="0.001"/>
+</testsuite>
