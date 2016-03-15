@@ -6,12 +6,13 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jc.sudoku.diagram.Column;
-import jc.sudoku.diagram.Diagram;
-import jc.sudoku.diagram.Node;
-import jc.sudoku.diagram.Row;
 import jc.sudoku.solver.logical.Strategy;
 import jc.sudoku.solver.logical.results.CandidateRemovedResult;
+import jc.sudoku.solver.logical.streams.StreamUtil;
+import jc.sudoku.puzzle.Candidate;
+import jc.sudoku.puzzle.Constraint;
+import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.Hit;
 import jc.sudoku.solver.logical.Result;
 
 // This strategy finds:
@@ -29,7 +30,7 @@ import jc.sudoku.solver.logical.Result;
 //   those rows can be removed. 
 //   
 // In terms of the set cover representation, this is c1 <= {r1,r2,r3}, c2 <= {r4,r5,r6},
-// c3 <= {r7,r8,r9} are distinct, disjoint 2- or 3-element columns such that
+// c3 <= {r7,r8,r9} are distinct, disjoint 2- or 3-hit constraints such that
 // intersect(r1,r4,r7) is non-empty, intersect(r2,r5,r8) is non-empty and intersect(r3,r6,r9)
 // is non-empty (omitting missing rows from the intersection calculation). Then any rows
 // r such that intersect(r, r1, r4, r7) is nonempty, r != r1,r4,r7, can be removed from the
@@ -39,27 +40,38 @@ public class NakedTriplesStrategy implements Strategy {
 	private static Logger LOG = LoggerFactory.getLogger(NakedTriplesStrategy.class);
 
 	@Override
-	public List<Result> findResults(Diagram diagram, int level) {
+	public List<Result> findResults(Puzzle puzzle) {
 		List<Result> results = new ArrayList<Result>();
+		LOG.info("Trying NakedTriplesStrategy");
 		
-		for (Column col1 = diagram.rootColumn.next; col1 != diagram.rootColumn; col1 = col1.next) {
-			if (col1.len > 3)
-				continue;						// each column must have 2 or 3 rows
+		for (Constraint c1 = puzzle.getRootConstraint().getNext();
+				c1 != puzzle.getRootConstraint();
+				c1 = c1.getNext()) {
+			// need disjoint constraints having 2 or 3 candidates
+			if (c1.getLength() > 3)	continue;
 
-			for (Column col2 = col1.next; col2 != diagram.rootColumn; col2 = col2.next) {
-				if (col2.len > 3)
-					continue;					// each column must have 2 or 3 rows
-				if (col2.intersects(col1))
-					continue;					// col1 and col2 must be disjoint
+			for (Constraint c2 = c1.getNext();
+					c2 != puzzle.getRootConstraint();
+					c2 = c2.getNext()) {
+				// need disjoint constraints having 2 or 3 candidates
+				if (c2.getLength() > 3) continue;
+				if (c2.hits(c1)) continue;
 				
-				for (Column col3 = col2.next; col3 != diagram.rootColumn; col3 = col3.next) {
-					if (col3.len > 3)
-						continue;				// each column must have 2 or 3 rows
-					if (col3.intersects(col1) || col3.intersects(col2))
-						continue;				// col3 must be disjoint from cols 1 and 2
+				for (Constraint c3 = c2.getNext();
+						c3 != puzzle.getRootConstraint();
+						c3 = c3.getNext()) {
+					// need disjoint constraints having 2 or 3 candidates
+					if (c3.getLength() > 3) continue;
+					if (c3.hits(c1) || c3.hits(c2)) continue;
 					
-					Node[][] nodes = buildNodesArray(col1, col2, col3);
-					checkConflicts(diagram, level, nodes, 0, results);
+					// put the nodes for these constraints into a 2D array
+					Hit[][] hits = StreamUtil.buildHitsArray(c1, c2, c3);
+					
+					// At least one of the constraints must have 3 hits, or
+					// the naked triple would just be 3 naked pairs. buildHitsArray
+					// creates a non-ragged array, so we can just check the first row.
+					if (hits[0].length == 3)
+						checkConflicts(puzzle, hits, 0, results);
 					
 					if (results.size() > 0)
 						return results;
@@ -69,56 +81,44 @@ public class NakedTriplesStrategy implements Strategy {
 		return results;
 	}
 	
-	private void buildNodesHelper(Node[][] nodes, int i, Column col) {
-		Node node = col.head.down;
-		for (int j = 0; j < 3; j++) {
-			nodes[i][j] = node;
-			if (node == null || node.down == col.head)
-				node = null;		// if the column has only two nodes, then add a null
-			else
-				node = node.down;
-		}
-	}
-	
-	private Node[][] buildNodesArray(Column col1, Column col2, Column col3) {
-		Node[][] nodes = new Node[3][3];
-		
-		buildNodesHelper(nodes, 0, col1);
-		buildNodesHelper(nodes, 1, col2);
-		buildNodesHelper(nodes, 2, col3);
-		
-		return nodes;
-	}
-
-	private void swap(Node[] nodes, int i, int j) {
-		Node t = nodes[i];
+	private void swap(Hit[] nodes, int i, int j) {
+		Hit t = nodes[i];
 		nodes[i] = nodes[j];
 		nodes[j] = t;
 	}
 	
-	// determine if the intersection of the rows containing n1, n2, n3 is non-empty,
+	// determine if the intersection of the candidates containing n1, n2, n3 is non-empty,
 	// being careful since on of them could be null
-	private boolean intersects(Node n1, Node n2, Node n3) {
+	private boolean intersects(Hit n1, Hit n2, Hit n3) {
 		if (n1 == null)
-			return (n2== null || n3 == null) ? false : n2.row.intersects(n3.row);
+			return (n2== null || n3 == null) ? false
+					: n2.getCandidate().hits(n3.getCandidate());
 		else if (n2 == null)
-			return (n1== null || n3 == null) ? false : n1.row.intersects(n3.row);
+			return (n1== null || n3 == null) ? false
+					: n1.getCandidate().hits(n3.getCandidate());
 		else if (n3 == null)
-			return (n1== null || n2 == null) ? false : n1.row.intersects(n2.row);
+			return (n1== null || n2 == null) ? false
+					: n1.getCandidate().hits(n2.getCandidate());
 		else
-			return n1.row.intersects(n2.row.intersect(n3.row));
+			return n1.getCandidate().hits(n2.getCandidate().sharedHits(n3.getCandidate()));
 	}
 	
-	private void checkConflicts(Diagram diagram, int level, Node[][] nodes, int n, List<Result> actions) {
-		if (n == 3) {
+	// recursively checks the hits in hits[][] for the naked triple pattern
+	private void checkConflicts(Puzzle puzzle, Hit[][] nodes,
+			int n, List<Result> actions) {
+		if (n == 2) {		// no need to permute the last constraint row
+			// if the hits at each position in the three constraint rows
+			// conflict with each other, then this is a naked triple pattern
 			for (int i = 0; i < 3; i++) {
 				if (!intersects(nodes[0][i], nodes[1][i], nodes[2][i]))
 					return;
 			}
 			
+			// OK these hits have the right pattern, so any candidates that
+			// conflict with the 2 or 3 nodes at each position can be removed
 			boolean foundOne = false;
 			for (int i = 0; i < 3; i++) {
-				foundOne |= check(diagram, level, nodes[0][i], nodes[1][i], nodes[2][i], actions);
+				foundOne |= check(puzzle, nodes[0][i], nodes[1][i], nodes[2][i], actions);
 			}
 			if (foundOne && LOG.isInfoEnabled()) {
 				StringBuilder sb = new StringBuilder();
@@ -126,7 +126,8 @@ public class NakedTriplesStrategy implements Strategy {
 				for (int i = 0; i < 3; i++) {
 					sb.append("(");
 					for (int j = 0; j < 3; j++) {
-						sb.append(nodes[i][j] == null ? "null" : nodes[i][j].row.name);
+						sb.append(nodes[i][j] == null ? "null"
+								: nodes[i][j].getCandidate().getName());
 						if (j < 2)
 							sb.append(", ");
 					}
@@ -139,37 +140,46 @@ public class NakedTriplesStrategy implements Strategy {
 			}
 		}
 		else {
+			// swap around the hits in row n, and recurse into row n+1
 			for (int i = 0; i < 3; i++) {
+				// try each node in the first position
 				swap(nodes[n], 0, i);
-				checkConflicts(diagram, level, nodes, n+1, actions);
+				checkConflicts(puzzle, nodes, n+1, actions);
+				
+				// swap the other two and try again
 				swap(nodes[n], 1, 2);
-				checkConflicts(diagram, level, nodes, n+1, actions);
+				checkConflicts(puzzle, nodes, n+1, actions);
+				
+				// put them back
 				swap(nodes[n], 1, 2);
 				swap(nodes[n], 0, i);
 			}
 		}
 	}
 
-	// we've determined that one of the 3 rows containing n1, n2 and n3 must be in the solution, any other rows that
-	// conflict with all of these can be removed
-	private boolean check(Diagram diagram, int level, Node n1, Node n2, Node n3, List<Result> actions) {
+	// we've determined that one of the 3 candidates containing n1, n2 and n3 must
+	// be in the solution, any other candidates that conflict with all of these can be removed
+	private boolean check(Puzzle puzzle,
+			Hit n1, Hit n2, Hit n3, List<Result> actions) {
 		boolean foundOne = false;
 		
-		for (Row r = diagram.rootRow.next; r != diagram.rootRow; r = r.next) {
-			if (n1 != null && r == n1.row) continue;
-			if (n2 != null && r == n2.row) continue;
-			if (n3 != null && r == n3.row) continue;
+		for (Candidate c = puzzle.getRootCandidate().getNext();
+				c != puzzle.getRootCandidate();
+				c = c.getNext()) {
+			if (n1 != null && c == n1.getCandidate()) continue;
+			if (n2 != null && c == n2.getCandidate()) continue;
+			if (n3 != null && c == n3.getCandidate()) continue;
 			
-			if (n1 != null && !r.intersects(n1.row)) continue;
-			if (n2 != null && !r.intersects(n2.row)) continue;
-			if (n3 != null && !r.intersects(n3.row)) continue;
+			if (n1 != null && !c.hits(n1.getCandidate())) continue;
+			if (n2 != null && !c.hits(n2.getCandidate())) continue;
+			if (n3 != null && !c.hits(n3.getCandidate())) continue;
 			
 			String name = String.format("conflicts with naked triple %s, %s, and %s",
-					n1 == null ? "---" : n1.row.name,
-					n2 == null ? "---" : n2.row.name,
-					n3 == null ? "---" : n3.row.name);
+					n1 == null ? "---" : n1.getCandidate().getName(),
+					n2 == null ? "---" : n2.getCandidate().getName(),
+					n3 == null ? "---" : n3.getCandidate().getName());
 			addAction(actions, 
-					new CandidateRemovedResult(diagram, r.firstNode, level, name));
+					new CandidateRemovedResult(puzzle, c, name));
 			foundOne = true;
 		}
 		return foundOne;
@@ -178,7 +188,7 @@ public class NakedTriplesStrategy implements Strategy {
 	private void addAction(List<Result> actions, Result action) {
 		// avoid duplicate candidate removals
 		for (Result act : actions)
-			if (act.getDescription().equals(action.getRowName()))
+			if (act.getDescription().equals(action.getCandidateName()))
 				return;
 		
 		actions.add(action);

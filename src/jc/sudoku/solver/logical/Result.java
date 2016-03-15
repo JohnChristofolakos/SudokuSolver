@@ -1,20 +1,16 @@
 package jc.sudoku.solver.logical;
 
-// This interface represents a finding by the logical solver.
-//
+// This interface represents a deduction found by the logical solver.
 public interface Result {
-	// returns the name of the row affected by this result
-	String getRowName();
+	// Returns the name of the candidate affected by this result
+	String getCandidateName();
 	
-	// returns a description of this result for logging
+	// Returns a description of this result for logging
 	String getDescription();			
 	
-	// returns the level number at which this result was found
-	int getLevel();
-	
-	// applies this result to the diagram
+	// Applies this result to the puzzle, returns the number of nodes updated
 	int apply();
 	
-	// un-applies this result from the diagram
+	// Un-applies this result from the puzzle
 	void undo();
 }

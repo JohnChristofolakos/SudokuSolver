@@ -6,13 +6,16 @@ import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import jc.sudoku.puzzle.Constraint;
+import jc.sudoku.puzzle.Hit;
+
 //
 // This class contains utility methods to create Streams of combinations or
 // permutations of their input collections. We need to be able to create streams
-// from Lists of Rows or Columns.
+// from lists of Candidates or Constraints.
 //
-// There are also a couple of utility methods to collect all the nodes from a
-// list of columns or a list of rows into a 2-D array.
+// There is also a utility method to collect all the hits from a
+// list of constraints into a 2-D array.
 //
 public class StreamUtil {
 	
@@ -23,13 +26,11 @@ public class StreamUtil {
 				Stream.of(Collections.emptyList()) :
 
 				// for each element in the list
-				IntStream.range(0,  list.size())
-				
-					// flatMap needs an object stream
-					.boxed()
+				IntStream.range(0,  list.size()).boxed()
 					
 					// flatten the streams returned from map() below
 					.flatMap(
+							
 							// permute the list after removing this element
 							i -> permute(remove(list, i))
 
@@ -40,9 +41,7 @@ public class StreamUtil {
 	
 	public static <E> Stream<List<E>> permuteHead(List<E> list, int headLength) {
 		// handle boundary cases
-		if (list.isEmpty())
-			return Stream.of(Collections.emptyList());
-		
+		if (list.isEmpty()) return Stream.of(Collections.emptyList());
 		if (headLength < 1) return Stream.of(list);
 		if (headLength >= list.size()) return permute(list);
 			
@@ -53,8 +52,7 @@ public class StreamUtil {
 
 	public static <E> Stream<List<E>> permuteTail(List<E> list, int tailLength) {
 		// handle boundary cases
-		if (list.isEmpty())
-			return Stream.of(Collections.emptyList());
+		if (list.isEmpty()) return Stream.of(Collections.emptyList());
 		if (tailLength < 1) return Stream.of(list);
 		if (tailLength >= list.size()) return permute(list);
 			
@@ -66,26 +64,27 @@ public class StreamUtil {
 	// Return a stream of lists which are the distinct combinations of the original
 	// list containing n elements.
 	public static <E> Stream<List<E>> choose(List<E> list, int n) {
-		return 	n <= 0 ? Stream.of(Collections.emptyList())
+		return 	// return just the empty set if n <= 0
+				n <= 0 ? Stream.of(Collections.emptyList())
 			   
+				// can trivially return the same list if n == list.size()
 				: n == list.size() ? Stream.of(new ArrayList<E>(list))
 					
-				: n > list.size() ? Stream.empty()		// e.g. no way to choose 5 number from a list of 3
+				// i.e. no way to choose 5 numbers from a list of 3
+				: n > list.size() ? Stream.empty()
 
-				: 	// for each element in the original list
-					IntStream.range(0, list.size())
+				// OK, we need to do real work - for each element in the original list
+				: IntStream.range(0, list.size()).boxed()
 				
-					   // flatMap needs an object stream
-					   .boxed()
-					
-					   // flatten the streams returned from map below
-					   .flatMap(
-							   // choose n-1 elements from the rest of the list
-							   i -> choose(list.subList(i+1, list.size()), n-1)
+					// flatten the streams returned from map below
+					.flatMap(
+
+						// choose n-1 elements from the rest of the list
+						i -> choose(list.subList(i+1, list.size()), n-1)
 							
-										// and prepend the current element to each list returned
-										.map(l -> prepend(l, list.get(i)))
-							);
+								// and prepend the current element to each list returned
+								.map(l -> prepend(l, list.get(i)))
+						);
 	}
 
 	// returns a list containing the first headLength elements of the original list
@@ -137,5 +136,55 @@ public class StreamUtil {
 		newList.add(0, e);
 		
 		return newList;
+	}
+
+	// Puts the hits for the specified constraint into an array row
+	public static void buildHitsHelper(Hit[] hits, Constraint c) {
+		Hit hit = c.getHead().getDown();
+		for (int i = 0; i < hits.length; i++) {
+			hits[i] = hit;
+			if (hit == null || hit.getDown() == c.getHead())
+				// if this constraint is short of hits, then add nulls
+				hit = null;		
+			else
+				hit = hit.getDown();
+		}
+	}
+	
+	// Puts the hits in the specified constraints into the rows of a 2D array
+	public static Hit[][] buildHitsArray(Constraint... constraints) {
+		int maxLength = 0;
+		for (Constraint c : constraints)
+			if (c.getLength() > maxLength)
+				maxLength = c.getLength();
+		
+		Hit[][] hits = new Hit[constraints.length][maxLength];
+		
+		int i = 0;
+		for (Constraint c : constraints) {
+			buildHitsHelper(hits[i], c);
+			i++;
+		}
+		
+		return hits;
+	}
+	
+	// For each constraint in the list, collects its candidate hits into
+	// a sublist and returns a list of all the sublists
+	public static List<List<Hit>> collectConstraintHits(List<Constraint> constraints) {
+		List<List<Hit>> lists = new ArrayList<>(constraints.size());
+		
+		for (Constraint c : constraints) {
+			List<Hit> hits = new ArrayList<>(c.getLength());
+			lists.add(hits);
+			
+			for (Hit hit = c.getHead().getDown();
+					hit != c.getHead();
+					hit = hit.getDown()) {
+				hits.add(hit);
+			}
+		}
+		
+		return lists;
 	}
 }

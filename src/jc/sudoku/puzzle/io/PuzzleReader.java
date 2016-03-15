@@ -1,17 +1,18 @@
-package jc.sudoku.diagram.io;
-
-import static jc.sudoku.main.Utils.panic;
+package jc.sudoku.puzzle.io;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import jc.sudoku.diagram.Diagram;
+import jc.sudoku.puzzle.Constraint;
+import jc.sudoku.puzzle.Puzzle;
+
+import static jc.sudoku.main.Utils.panic;
 
 // Class that contains most of the implementation to read in a
-// sudoku description and initialize the corresonding Diagram.
+// Sudoku description and initialize the corresponding Puzzle.
 //
 // Concrete subclasses must implement the inputRow(int r) method,
-// which should read the next row of the diagram. The parameter
+// which should read the next row of the puzzle. The parameter
 // r is provided for the convenience of array-based readers,
 // stream-based readers can assume that inputRow() will be
 // called with sequentially increasing row number, starting from zero.
@@ -21,7 +22,7 @@ import jc.sudoku.diagram.Diagram;
 // characters - either a digit if the cell is a hint, or a '.' to
 // indicate a cell to be solved.
 //
-public abstract class DiagramReader {
+public abstract class PuzzleReader {
 	// things to cover
 	int[][] row = new int[9][10];
 	int[][] col = new int[9][10];
@@ -30,6 +31,7 @@ public abstract class DiagramReader {
 	// positions already filled
 	int[][] board = new int[9][9];
 
+	// Parses a line into the arrays above, checking for conflicts
 	private void parseLine(int r, String line) {
 		if (line.length() != 9)
 			panic("Input line should have 9 characters exactly!");
@@ -37,7 +39,8 @@ public abstract class DiagramReader {
 		for (int c = 0; c < 9; c++) {
 			if (line.charAt(c) != '.') {
 				if (line.charAt(c) < '1' || line.charAt(c) > '9')
-					panic("Illegal character '" + line.charAt(c) + "' in input line " + r + "!");
+					panic("Illegal character '" + line.charAt(c) +
+							"' in input line " + r + "!");
 
 				int d = line.charAt(c) - '0';
 				if (row[r][d] != 0)
@@ -58,63 +61,62 @@ public abstract class DiagramReader {
 		}
 	}
 	
-	// populates the diagram with the fixed set of column names corresponding to a
+	// Populates the diagram with the fixed set of column names corresponding to a
 	// (standard) Sudoku diagram
-	//
-	private void outputColNames(Diagram diagram) {
+	private void generateConstraints(Puzzle puzzle) {
+		// create the cell constraints first
 		for (int r = 0; r < 9; r++) {
 			for (int c = 0; c < 9; c++) {
-				String colName = "p" + r + c;
-				diagram.addColumn(colName);
+				puzzle.addConstraint("p" + r + c, Constraint.Type.CELL);
 			}
 		}
 		
-		// we need three separate nested loops in order to ensure all of the r columns precede
-		// the c columns, which precede the b columns. So when we add the rows below, we can
-		// ensure the row entries are in ascending column number order. Routines like row.intersect
-		// depend on this.
+		// we need three separate nested loops in order to ensure all of the
+		// row constraints precede the column constraints, which precede the
+		// box constraints. So when we add the candidates below, we can ensure
+		// candidate hits are added to the row in ascending constraint number
+		// order. Routines like candidate#sharedHits depend on this ordering.
 		for (int i = 0; i < 9; i++) {
 			for (int d = 1; d <= 9; d++) {
-				String colName = "r" + i + d;
-				diagram.addColumn(colName);
+				puzzle.addConstraint("r" + i + d, Constraint.Type.ROW);
 			}
 		}
 		for (int i = 0; i < 9; i++) {
 			for (int d = 1; d <= 9; d++) {
-				String colName = "c" + i + d;
-				diagram.addColumn(colName);
+				puzzle.addConstraint("c" + i + d, Constraint.Type.COLUMN);
 			}
 		}
 		for (int i = 0; i < 9; i++) {
 			for (int d = 1; d <= 9; d++) {
-				String colName = "b" + i + d;
-				diagram.addColumn(colName);
+				puzzle.addConstraint("b" + i + d, Constraint.Type.BOX);
 			}
 		}
 	}
 
-	// Populates the diagram with the rows corresponding to the specified
-	// cell: the row name, and the list of columns for which this row contains a 1.
-	//
-	private void outputPossibles(Diagram diagram, int c, int r) {
+	// Populates the diagram with the candidates corresponding to the specified
+	// cell: generates the candidate name, and the list of constraints hit by
+	// the candidate
+	private void generateCandidates(Puzzle diagram, int c, int r) {
 		// calculate the box number for this (r,c)
 		int x = ((r/3))*3 + (c/3);
 		
 		// loop through the possible digits
 		for (int d = 1; d <= 9; d++) {
-			// create the row corresponding to the placement of digit d into this cell
-			List<String> colNames = new ArrayList<String>();
-			colNames.add("p" + r + c);		// fills the cell at (r,c)
-			colNames.add("r" + r + d);		// contributes digit d to row r
-			colNames.add("c" + c + d);		// contributes digit d to column c
-			colNames.add("b" + x + d);		// contributes digit d to box x 
+			// create the row corresponding to placing digit d into this cell
+			List<String> hits = new ArrayList<String>();
+			
+			// fill the list in the same order as the columns were created above
+			hits.add("p" + r + c);		// fills the cell at (r,c)
+			hits.add("r" + r + d);		// hits digit d in row r
+			hits.add("c" + c + d);		// hits digit d in column c
+			hits.add("b" + x + d);		// hits digit d in box x 
 			
 			// add the row to the diagram
-			diagram.addRow("r" + r + "c" + c + "d" + d, colNames);
+			diagram.addCandidate("r" + r + "c" + c + "d" + d, hits);
 		}
 	}
 
-	// reads the input - may be either 9 lines of 9 chars each, or a single
+	// Reads the input - may be either 9 lines of 9 chars each, or a single
 	// line of 81 chars
 	public void read() {
 		String line = inputRow(0);
@@ -136,23 +138,25 @@ public abstract class DiagramReader {
 		}
 	}
 
-	public void generate(Diagram diagram) {
-		// populate the column names
-		outputColNames(diagram);
+	// Generate the puzzle. In this implementation, we generate a
+	// 'blank' diagram first, then add the hints.
+	public void generate(Puzzle puzzle) {
+		// populate the constraint names
+		generateConstraints(puzzle);
 		
-		// populate the rows corresponding to each cell
+		// populate the candidates for to each cell
 		for (int c = 0; c < 9; c++)
 			for (int r = 0; r < 9; r++)
-				outputPossibles(diagram, c, r);
+				generateCandidates(puzzle, c, r);
 		
-		// add the hinted cells to the diagram - this will cause the
-		// corresponding columns to be 'covered'
+		// add the hinted cells to the puzzle - this will cause the
+		// corresponding constraints to be 'covered'
 		for (int c = 0; c < 9; c++)
 			for (int r = 0; r < 9; r++)
 				if (board[r][c] != 0)
-					diagram.addHint("r" + r + "c" + c + "d" + board[r][c]);
+					puzzle.addHint("r" + r + "c" + c + "d" + board[r][c]);
 	}
 	
-	// to be implemented by the concrete subclasses
+	// To be implemented by the concrete subclasses
 	public abstract String inputRow(int r);
 }

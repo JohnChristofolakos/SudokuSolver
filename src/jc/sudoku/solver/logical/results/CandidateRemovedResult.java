@@ -1,53 +1,44 @@
 package jc.sudoku.solver.logical.results;
 
-import jc.sudoku.diagram.Diagram;
-import jc.sudoku.diagram.Node;
+import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.Candidate;
 import jc.sudoku.solver.logical.Result;
 
-// This class represents a finding by the logical solver that a given
-// row (identified by any of its nodes) cannot be part of the solution,
-// i.e. a candidate for a cell can be crossed out.
-//
+// This class represents a finding by the logical solver that this
+// candidate cannot be part of the solution
 public class CandidateRemovedResult implements Result {
-	public CandidateRemovedResult(Diagram diagram, Node node, int level, String name) {
-		this.diagram = diagram;
-		this.rowRemoved = node;
-		this.level = level;
-		this.name = name;
+	public CandidateRemovedResult(Puzzle puzzle, Candidate candidate, String desc) {
+		this.puzzle = puzzle;
+		this.candidateRemoved = candidate;
+		this.desc = desc;
 	}
 	
-	private Diagram diagram;
-	private Node rowRemoved;
-	private int level;
-	private String name;
+	private Puzzle puzzle;
+	private Candidate candidateRemoved;
+	private String desc;
 	
 	@Override
-	public String getRowName() {
-		return rowRemoved.row.name;
+	public String getCandidateName() {
+		return candidateRemoved.getName();
 	}
 	
 	@Override
 	public String getDescription() { 
-		return name;
+		return desc;
 	}
 	
 	@Override
-	public int getLevel() {
-		return level;
-	}
-
-	@Override
 	public int apply() {
-		return diagram.eliminateRow(rowRemoved);
+		return puzzle.eliminateCandidate(candidateRemoved);
 	}
 
 	@Override
 	public void undo() {
-		diagram.restoreRow(rowRemoved);
+		puzzle.restoreCandidate(candidateRemoved);
 	}
 	
 	@Override
 	public String toString() {
-		return "candidate row removed - " + diagram.rowName(rowRemoved);
+		return "candidate removed - " + candidateRemoved.toString();
 	}
 }

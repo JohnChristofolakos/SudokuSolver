@@ -18,12 +18,12 @@ import jc.sudoku.solver.logical.Result;
 // candidates in a cell' constraints. If they represent 'last 2 candidates in a row,
 // column, or box', then it's really a short chain of some type.
 //
-// This is implemented as a special case of the GenYWingStrategy, where the constraints
-// are restricted to being cell type constraints
+// This is implemented as a special case of the GenYWingStrategyStreamed, where the
+// constraints are restricted to being cell type constraints
 //
-public class YWingStrategy implements Strategy {	
-	public YWingStrategy() {
-		strategy = new GenYWingStrategy(true);		// limit to cells
+public class YWingStrategyStreamed implements Strategy {	
+	public YWingStrategyStreamed() {
+		strategy = new GenYWingStrategyStreamed(true);		// limit to cells
 	}
 	private Strategy strategy;
 	

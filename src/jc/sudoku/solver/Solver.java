@@ -1,8 +1,7 @@
 package jc.sudoku.solver;
 
-//
-// Basic interface for a Sudoku solver.
-//
+// Basic Solver interface.
+@FunctionalInterface
 public interface Solver {
 	public int solve();			// returns number of solutions found
 }

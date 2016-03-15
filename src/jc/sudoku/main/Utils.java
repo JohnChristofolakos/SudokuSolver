@@ -1,6 +1,6 @@
 package jc.sudoku.main;
 
-// TODO Should be replaces with appropriate exception handling someday
+// TODO Should be replaced with appropriate exception handling someday
 //
 public class Utils {
 	public static void panic(String msg) {

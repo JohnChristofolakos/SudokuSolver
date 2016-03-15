@@ -8,45 +8,56 @@ import java.io.InputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jc.sudoku.diagram.Diagram;
-import jc.sudoku.diagram.io.DiagramReader;
-import jc.sudoku.diagram.io.DiagramStreamReader;
-import jc.sudoku.diagram.io.DiagramStringReader;
+import jc.dlx.solver.DlxSolver;
+import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.io.PuzzleReader;
+import jc.sudoku.puzzle.io.PuzzleStreamReader;
+import jc.sudoku.puzzle.io.PuzzleStringReader;
 import jc.sudoku.solver.Solver;
-import jc.sudoku.solver.dlx.DlxSolver;
 import jc.sudoku.solver.logical.LogicalSolver;
 
 import com.beust.jcommander.*;
 
+// Main class for testing from the command line
 public class Main {
 	private static Logger LOG = LoggerFactory.getLogger(Main.class);
 	
 	// members for parsed command line args
-	@Parameter(names = { "--puzzle", "-p"}, description = "Loads the puzzle from the next command line argument")
+	@Parameter(names = { "--puzzle", "-p"},
+			description = "Loads the puzzle from the next command line argument")
 	String puzzleData;
 
-	@Parameter(names = { "--canned", "-c"}, description = "Loads one of several canned  puzzles")
+	@Parameter(names = { "--canned", "-c"},
+			description = "Loads one of several canned  puzzles")
 	String puzzleName;
 	
-	@Parameter(names = { "--file", "-f"}, description = "Loads a puzzle from a file")
+	@Parameter(names = { "--file", "-f"},
+			description = "Loads a puzzle from a file")
 	String puzzlePath;
 	
-	@Parameter(names = { "-" }, description = "Loads a puzzle from std input")
+	@Parameter(names = { "-" },
+			description = "Loads a puzzle from std input")
 	boolean puzzleStdInput = false;
 	
-	@Parameter(names = { "--knuth", "--dlx", "-k" }, description = "Uses Knuth's brute force DLX algorithm")
+	@Parameter(names = { "--knuth", "--dlx", "-k" },
+			description = "Uses Knuth's brute force DLX algorithm")
 	boolean solverKnuth = false;
 	
-	@Parameter(names = { "--logical", "-l" }, description = "Uses the logical solver")
+	@Parameter(names = { "--logical", "-l" },
+			description = "Uses the logical solver")
 	boolean solverLogical = false;
 	
-	@Parameter(names = "--help", description = "Displays this usage text", help = true)
+	@Parameter(names = { "--streamed", "-s" },
+			description = "Use streamed versions of solving strategies")
+	private boolean useStreamed = false;
+	
+	@Parameter(names = "--help",
+			description = "Displays this usage text", help = true)
 	private boolean help;
 	
-	// entry point - just creates an instance of Main then creates a JCommander
+	// Entry point - just creates an instance of Main then creates a JCommander
 	// to parse the command line args into member data. Then calls the run() method
 	// of the Main instance to do the real work.
-	//
 	public static void main(String[] args) {
 		Main main = new Main();
 		JCommander jCmdr = null;
@@ -62,15 +73,14 @@ public class Main {
 		main.run(jCmdr);
 	}
 	
-	// setup and return a DiagramReader according to the command line parameters
-	//
-	private DiagramReader makeDiagramReader() {
-		DiagramReader reader = null;
+	// Returns a DiagramReader setup according to the command line parameters
+	private PuzzleReader makeDiagramReader() {
+		PuzzleReader reader = null;
 		if (puzzleStdInput) {
 			if (puzzleName != null || puzzlePath != null || puzzleData != null) {
 				System.err.format("Only one of --puzzle, --file, --canned, - may be specified\n");
 			} else {
-				reader = new DiagramStreamReader(System.in);
+				reader = new PuzzleStreamReader(System.in);
 			}
 		} else if (puzzleName != null) {
 			if (puzzlePath != null || puzzleData != null) {
@@ -82,7 +92,7 @@ public class Main {
 					for (String name : Puzzles.getPuzzleNames())
 						System.err.format("  %s\n",  name);
 				} else { 
-					reader = new DiagramStringReader(puzzle);
+					reader = new PuzzleStringReader(puzzle);
 				}
 			}
 		}
@@ -98,24 +108,23 @@ public class Main {
 				}
 				
 				if (stream != null) {
-					reader = new DiagramStreamReader(stream);
+					reader = new PuzzleStreamReader(stream);
 				}
 			}
 		}
 		else if (puzzleData != null) {
 			InputStream stream = new ByteArrayInputStream(puzzleData.getBytes());
-			reader = new DiagramStreamReader(stream);
+			reader = new PuzzleStreamReader(stream);
 		}
 		
 		return reader;
 	}
 	
 	// Here's where the stuff happens
-	//
 	private void run(JCommander jCmdr) {
 		boolean goodParms = true;
 		
-		DiagramReader reader = makeDiagramReader();
+		PuzzleReader reader = makeDiagramReader();
 		if (reader == null) {
 			goodParms = false;
 		}
@@ -137,34 +146,39 @@ public class Main {
 		// read the puzzle
 		reader.read();
 
-		// generate the diagram
-		Diagram diagram = new Diagram();
-		reader.generate(diagram);
+		// generate the puzzle
+		Puzzle puzzle = new Puzzle();
+		reader.generate(puzzle);
 		
 		// create and invoke the specified solver
 		Solver solver = null;
 		if (solverKnuth) {
-			solver = new DlxSolver(diagram);
+			solver = new DlxSolver(puzzle.getDlxDiagram());
 			solver.solve();
-			// the Knuth solver prints solutions as it finds them, or will simply print none
-			// if the puzzle was unsolvable
+			// The Knuth solver prints solutions as it finds them, or will
+			// simply print none if the puzzle was unsolvable. When it
+			// returns, the puzzle is completely restored to its original
+			// state, so there's nothing of interest to print at this point.
+			
 		} else {
-			solver = new LogicalSolver(diagram);
+			solver = new LogicalSolver(puzzle, useStreamed);
 			long startTime = System.currentTimeMillis();
 			solver.solve();
-			System.out.format("Solver finished in %d millis\n", System.currentTimeMillis() - startTime);
+			System.out.format("Solver finished in %d millis\n",
+					System.currentTimeMillis() - startTime);
 			
-			// the logical solver will update the diagram status when it's finished
-			if (diagram.isBlocked) {
-				// the puzzle was unsolvable, or perhaps a bug in the logical strategies
+			// the logical solver will leave the puzzle in its final state
+			if (puzzle.isBlocked()) {
+				// the puzzle was unsolvable, or a bug in the logical strategies
 				System.out.println("Puzzle is blocked at this position");
-			} else if (diagram.isSolved) {
+			} else if (puzzle.isSolved()) {
 				System.out.println("Puzzle is solved!!");
 			} else {
 				System.out.println("Ran out of ideas at this position");
 			}
 			
-			String s = diagram.toString();
+			// Print the final puzzle position, and log it as well
+			String s = puzzle.toString();
 			LOG.info(s);
 			System.out.print(s);
 		}

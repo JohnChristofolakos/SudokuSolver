@@ -8,12 +8,12 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jc.sudoku.diagram.Diagram;
-import jc.sudoku.diagram.Node;
-import jc.sudoku.diagram.Row;
 import jc.sudoku.solver.logical.Strategy;
 import jc.sudoku.solver.logical.results.CandidateRemovedResult;
 import jc.sudoku.solver.logical.streams.StreamUtil;
+import jc.sudoku.puzzle.Candidate;
+import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.Hit;
 import jc.sudoku.solver.logical.Result;
 
 import static jc.sudoku.solver.logical.streams.StreamUtil.permute;
@@ -35,9 +35,9 @@ import static jc.sudoku.solver.logical.streams.StreamUtil.permute;
 // pointing pair.
 //
 // In terms of the set cover representation, this is c1, c2 distinct, disjoint 2-element
-// columns {r1,r2} and {r3,r4} such intersect(r1,r3) and intersect(r2,r4) are both
-// non-empty. Then any row r where intersect(r,r1) and intersect(r,r3) are both non-empty
-// can be removed.
+// constraints {r1,r2} and {r3,r4} such that intersect(r1,r3) and intersect(r2,r4)
+// are both non-empty. Then any row r where intersect(r,r1) and intersect(r,r3) are
+// both non-empty can be removed.
 //
 // This implementation of the strategy uses the Java Streams facility to attempt to
 // speed up the search using parallelism.
@@ -46,26 +46,29 @@ public class NakedPairsStrategyStreamed implements Strategy {
 	private static Logger LOG = LoggerFactory.getLogger(NakedPairsStrategyStreamed.class);
 	
 	@Override
-	public List<Result> findResults(Diagram diagram, int level) {
+	public List<Result> findResults(Puzzle puzzle) {
+		LOG.info("Trying NakedPairsStrategyStreamed");
+
 		Optional<List<Result>> results =
-				// get all pairs of columns having 2 rows each
-				StreamUtil.choose(diagram.colsList(2), 2)
+				// get all pairs of constraints having 2 candidates each
+				StreamUtil.choose(puzzle.getActiveConstraints(2), 2)
 				
-				// the two columns must be disjoint
-				.filter(cols -> !cols.get(0).intersects(cols.get(1)))
+				// the two constraints must be disjoint
+				.filter(constraints -> !constraints.get(0).hits(constraints.get(1)))
 				
-				// collect the nodes from these columns into a list of two node lists
-				.<List<List<Node>>> map(cols -> Diagram.collectColumnNodes(cols))
+				// collect the hits from these constraints into a list of two hit lists
+				.<List<List<Hit>>> map(constraints
+								-> StreamUtil.collectConstraintHits(constraints))
 				
-				// permute the second column's node list
-				.<List<List<Node>>> flatMap(lln -> permute(lln.get(1))
-														.<List<List<Node>>> map(l -> Arrays.asList(lln.get(0), l)))
+				// permute the second constraint's hit list
+				.<List<List<Hit>>> flatMap(hits -> permute(hits.get(1))
+							.<List<List<Hit>>> map(l -> Arrays.asList(hits.get(0), l)))
 				
 				// parallelize the checking
 				.parallel()
 				
 				// check if they form a naked pair that can eliminate candidates
-				.map(ll -> checkNakedPair(diagram, level, ll))
+				.map(ll -> checkNakedPair(puzzle, ll))
 				
 				// filter out the failed checks
 				.filter(o -> o.isPresent())
@@ -83,22 +86,23 @@ public class NakedPairsStrategyStreamed implements Strategy {
 		}
 	}
 	
-	private Optional<List<Result>> checkNakedPair(Diagram diagram, int level, List<List<Node>> nodes) {
+	private Optional<List<Result>> checkNakedPair(Puzzle puzzle,
+			List<List<Hit>> hits) {
 		List<Result> results = new ArrayList<>();
 		
-		LOG.debug("Checking naked pair ({}, {}) in {} and ({}, {}) in {}",
-				nodes.get(0).get(0).row.name,
-				nodes.get(0).get(1).row.name,
-				nodes.get(0).get(0).col.name,
-				nodes.get(1).get(0).row.name,
-				nodes.get(1).get(1).row.name,
-				nodes.get(1).get(0).col.name);
+		LOG.trace("Checking naked pair ({}, {}) in {} and ({}, {}) in {}",
+				hits.get(0).get(0).getCandidate().getName(),
+				hits.get(0).get(1).getCandidate().getName(),
+				hits.get(0).get(0).getConstraint().getName(),
+				hits.get(1).get(0).getCandidate().getName(),
+				hits.get(1).get(1).getCandidate().getName(),
+				hits.get(1).get(0).getConstraint().getName());
 				
-		checkConflicts(diagram, level,
-				nodes.get(0).get(0),
-				nodes.get(0).get(1),
-				nodes.get(1).get(0),
-				nodes.get(1).get(1),
+		checkConflicts(puzzle,
+				hits.get(0).get(0),
+				hits.get(0).get(1),
+				hits.get(1).get(0),
+				hits.get(1).get(1),
 				results				
 				);
 		
@@ -108,36 +112,50 @@ public class NakedPairsStrategyStreamed implements Strategy {
 			return Optional.of(results);
 	}
 	
-	private void checkConflicts(Diagram diagram, int level, Node n1, Node n2, Node n3, Node n4, List<Result> results) {
-		if (n1.row.intersects(n3.row) && n2.row.intersects(n4.row)) {
-			// we've determined that either row1 or row3 must be in the solution, and either row2 or row4 must be in the solution
-			// eliminate all candidates that conflict with either of these pairs
-			Row r = diagram.rootRow.next;
-			while (r != diagram.rootRow) {
-				if (r != n1.row && r != n3.row) {
-					if (r.intersects(n1.row) && r.intersects(n3.row)) {
-						LOG.info("Found row {} conflicts with naked pair: {} vs {} and {} vs {} ({}/{})",
-								r.name, n1.row.name, n3.row.name, n2.row.name, n4.row.name,
-								n1.col.name, n3.col.name);
-						results.add(new CandidateRemovedResult(diagram, r.firstNode, level,
+	private void checkConflicts(Puzzle puzzle,
+			Hit h1, Hit h2, Hit h3, Hit h4,
+			List<Result> results) {
+		if (h1.getCandidate().hits(h3.getCandidate()) &&
+			h2.getCandidate().hits(h4.getCandidate())) {
+			// So if n1 is in, then n4 must be in, if n1 is out, then n3 must
+			// be in. In other words, one of n1, n3 must be in, and similarly
+			// one of n2, n4 must be in.
+			//
+			// We can eliminate all candidates that conflict with both members
+			// of either pair.
+			for (Candidate c = puzzle.getRootCandidate().getNext();
+					c!= puzzle.getRootCandidate();
+					c = c.getNext()) {
+				if (c != h1.getCandidate() && c != h3.getCandidate()) {
+					if (c.hits(h1.getCandidate()) &&
+						c.hits(h3.getCandidate())) {
+						LOG.info("Found candidate {} conflicts with naked pair: {} vs {} and {} vs {} ({}/{})",
+								c.getName(),
+								h1.getCandidate().getName(), h3.getCandidate().getName(),
+								h2.getCandidate().getName(), h4.getCandidate().getName(),
+								h1.getConstraint().getName(), h3.getConstraint().getName());
+						results.add(new CandidateRemovedResult(puzzle, c,
 								String.format("conflicts with naked pair (%s, %s) and (%s, %s) (%s/%s)",
-										n1.row.name, n3.row.name, n2.row.name, n4.row.name,
-										n1.col.name, n3.col.name)));
+										h1.getCandidate().getName(), h3.getCandidate().getName(), h2.getCandidate().getName(), h4.getCandidate().getName(),
+										h1.getConstraint().getName(), h3.getConstraint().getName())));
 					}
 				}
 
-				if (r != n2.row && r != n4.row) {
-					if (r.intersects(n2.row) && r.intersects(n4.row)) {
-						LOG.info("Found row {} conflicts with naked pair: {} vs {} and {} vs {} ({}/{})",
-								r.name, n2.row.name, n4.row.name, n1.row.name, n3.row.name,
-								n1.col.name, n3.col.name);
-						results.add(new CandidateRemovedResult(diagram, r.firstNode, level,
+				if (c != h2.getCandidate() && c != h4.getCandidate()) {
+					if (c.hits(h2.getCandidate()) &&
+						c.hits(h4.getCandidate())) {
+						LOG.info("Found candidate {} conflicts with naked pair: {} vs {} and {} vs {} ({}/{})",
+								c.getName(),
+								h2.getCandidate().getName(), h4.getCandidate().getName(),
+								h1.getCandidate().getName(), h3.getCandidate().getName(),
+								h1.getConstraint().getName(), h3.getConstraint().getName());
+						results.add(new CandidateRemovedResult(puzzle, c,
 								String.format("conflicts with naked pair (%s, %s) and (%s, %s) (%s/%s)",
-										n2.row.name, n4.row.name, n1.row.name, n3.row.name,
-										n1.col.name, n3.col.name)));
+										h2.getCandidate().getName(), h4.getCandidate().getName(),
+										h1.getCandidate().getName(), h3.getCandidate().getName(),
+										h1.getConstraint().getName(), h3.getConstraint().getName())));
 					}
 				}
-				r = r.next;
 			}
 		}
 	}

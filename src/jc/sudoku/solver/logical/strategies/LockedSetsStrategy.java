@@ -8,9 +8,9 @@ import org.slf4j.LoggerFactory;
 
 import jc.sudoku.solver.logical.Strategy;
 import jc.sudoku.solver.logical.results.CandidateRemovedResult;
-import jc.sudoku.diagram.Column;
-import jc.sudoku.diagram.Diagram;
-import jc.sudoku.diagram.Node;
+import jc.sudoku.puzzle.Constraint;
+import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.Hit;
 import jc.sudoku.solver.logical.Result;
 
 // This strategy looks for locked/hidden pairs or triples - units that have only
@@ -31,46 +31,53 @@ public class LockedSetsStrategy implements Strategy {
 	private static Logger LOG = LoggerFactory.getLogger(LockedSetsStrategy.class);
 
 	@Override
-	public List<Result> findResults(Diagram diagram, int level) {
+	public List<Result> findResults(Puzzle puzzle) {
 		List<Result> results = new ArrayList<Result>();
-		
-		for (Column col1 = diagram.rootColumn.next; col1 != diagram.rootColumn; col1 = col1.next) {
-			for (Column col2 = col1.next; col2 != diagram.rootColumn; col2 = col2.next) {
-				if (col1.len == col2.len)
-					continue;		// this strategy won't apply - one column must be
-									// a strict subset of the other
+		LOG.info("Trying LockedSetsStrategy");
 
-				// set up c1 to be the smaller column, c2 the larger
-				Column c1, c2;
-				if (col1.len > col2.len) {
-					c1 = col2; c2 = col1;
+		for (Constraint c1 = puzzle.getRootConstraint().getNext();
+				c1 != puzzle.getRootConstraint();
+				c1 = c1.getNext()) {
+			for (Constraint c2 = c1.getNext();
+					c2 != puzzle.getRootConstraint();
+					c2 = c2.getNext()) {
+				// one constraint's hits must be a strict subset of the other's
+				if (c1.getLength() == c2.getLength()) continue;
+
+				// set up cMin to be the smaller constraint, cMax the larger
+				Constraint cMin, cMax;
+				if (c1.getLength() > c2.getLength()) {
+					cMin = c2; cMax = c1;
 				} else {
-					c1 = col1; c2 = col2;
+					cMin = c1; cMax = c2;
 				}
 
-				if (c1.isStrictSubsetOf(c2)) {
-					LOG.info("Found locked set in columns {} and {}", c1.name, c2.name);
+				if (cMin.isStrictSubsetOf(cMax)) {
+					LOG.info("Found locked set in constraints {} and {}",
+							cMin.getName(), cMax.getName());
 
-					List<Node> diff = c2.minus(c1);
-					for (Node n : diff) {
+					List<Hit> diff = cMax.minus(cMin);
+					for (Hit n : diff) {
 						String name;
-						if (c1.name.charAt(0) == 'b')
+						if (cMin.getName().charAt(0) == 'b')
 							name = String.format("Pointing %s of candidate %c in box %c removed from %s %c",
-								c1.len == 2 ? "pair" : (c1.len == 3 ? "triple" : Integer.toString(c1.len) + "-tuple"),
-								c1.name.charAt(2),
-								c1.name.charAt(1),
-								c2.getType(),
-								c2.name.charAt(1)
+								cMin.getLength() == 2 ? "pair"
+										: (cMin.getLength() == 3 ? "triple"
+										: Integer.toString(cMin.getLength()) + "-tuple"),
+								cMin.getName().charAt(2),
+								cMin.getName().charAt(1),
+								cMax.getType(),
+								cMax.getName().charAt(1)
 								);
 						else
 							name = String.format("Box/line reduction of candidate %c in %s %c removed from %s %c",
-									c1.name.charAt(2),
-									c1.getType(),
-									c1.name.charAt(1),
-									c2.getType(),
-									c2.name.charAt(1)
+									cMin.getName().charAt(2),
+									cMin.getType(),
+									cMin.getName().charAt(1),
+									cMax.getType(),
+									cMax.getName().charAt(1)
 									);
-						results.add(new CandidateRemovedResult(diagram, n, level, name));
+						results.add(new CandidateRemovedResult(puzzle, n.getCandidate(), name));
 					}
 					return results;
 				}

@@ -1,4 +1,4 @@
-package jc.sudoku.diagram.io;
+package jc.sudoku.puzzle.io;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -9,12 +9,11 @@ import static jc.sudoku.main.Utils.panic;
 
 // A concrete subclass of DiagramReader that takes input
 // from a specified input stream.
-//
-public class DiagramStreamReader extends DiagramReader {
+public class PuzzleStreamReader extends PuzzleReader {
 	InputStream stream;
 	int lineNo = 0;
 	
-	public DiagramStreamReader(InputStream stream) {
+	public PuzzleStreamReader(InputStream stream) {
 		this.stream = stream;
 	}
 	

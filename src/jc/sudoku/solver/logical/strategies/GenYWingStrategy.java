@@ -6,12 +6,11 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jc.sudoku.diagram.Column;
-import jc.sudoku.diagram.Diagram;
-import jc.sudoku.diagram.Node;
-import jc.sudoku.diagram.Row;
 import jc.sudoku.solver.logical.Strategy;
 import jc.sudoku.solver.logical.results.CandidateRemovedResult;
+import jc.sudoku.puzzle.Candidate;
+import jc.sudoku.puzzle.Constraint;
+import jc.sudoku.puzzle.Puzzle;
 import jc.sudoku.solver.logical.Result;
 
 // This strategy looks for a generalised Y-Wing (also called XY-Wing) - for example
@@ -29,54 +28,88 @@ import jc.sudoku.solver.logical.Result;
 // non-empty. Then any rows r where intersect(r, r4) and intersect(r,r6) are both
 // non-empty can be removed.
 //
-// This is the same set logic as the Y-Wing, except that the columns involved are not
-// constrained to be bi-value cell-type constraints, they may be constraints on rows,
-// columns, or boxes.
+// This is the same set logic as the Y-Wing, except that the constraints involved
+// are not restricted to bi-value cell-type constraints, they may be constraints
+// on rows, columns, or boxes.
+//
+// The implementation will by default find generalised Y-Wings (XY-Wings), or will
+// find Y-Wings if constructed with the limitToCells parameter set to true.
 //
 public class GenYWingStrategy implements Strategy {	
 	private static Logger LOG = LoggerFactory.getLogger(GenYWingStrategy.class);
 
+	public GenYWingStrategy() {
+		this(false);
+	}
+	
+	public GenYWingStrategy(boolean limitToCells) {
+		this.limitToCells = limitToCells;
+	}
+	
+	private boolean limitToCells;
+	
 	@Override
-	public List<Result> findResults(Diagram diagram, int level) {
+	public List<Result> findResults(Puzzle puzzle) {
 		List<Result> results = new ArrayList<Result>();
+		LOG.info("Trying GenYWingStrategy");
 		
 		// loop through the combinations for c1, c2, c3
-		for (Column col1 = diagram.rootColumn.next; col1 != diagram.rootColumn; col1 = col1.next) {
-			if (col1.len != 2) continue; 						// this strategy needs columns with 2 rows
+		for (Constraint c1 = puzzle.getRootConstraint().getNext();
+				c1 != puzzle.getRootConstraint();
+				c1 = c1.getNext()) {
+			// optionally may be limited to cell type constraints
+			if (limitToCells && c1.getType() != Constraint.Type.CELL) continue;
+
+			// this strategy needs disjoint bi-value constraints
+			if (c1.getLength() != 2) continue;
 			
-			for (Column col2 = col1.next; col2 != diagram.rootColumn; col2 = col2.next) {
-				if (col2.len != 2) continue;					// this strategy needs columns with 2 rows
-				if (col2.intersects(col1)) continue;			// col1 and col2 must be disjoint
+			for (Constraint c2 = c1.getNext();
+					c2 != puzzle.getRootConstraint();
+					c2 = c2.getNext()) {
+				// optionally may be limited to cell type constraints
+				if (limitToCells && c1.getType() != Constraint.Type.CELL) continue;
+
+				// this strategy needs disjoint bi-value constraints
+				if (c2.getLength() != 2) continue;
+				if (c2.hits(c1)) continue;
 				
-				for (Column col3 = col2.next; col3 != diagram.rootColumn; col3 = col3.next) {
-					if (col3.len != 2) continue;				// this strategy needs columns with 2 rows
-					if (col3.intersects(col1)) continue;		// col1 and col3 must be disjoint
-					if (col3.intersects(col2)) continue;		// col1 and col2 must be disjoint
+				
+				for (Constraint c3 = c2.getNext();
+						c3 != puzzle.getRootConstraint();
+						c3 = c3.getNext()) {
+					// optionally may be limited to cell type constraints
+					if (limitToCells && c1.getType() != Constraint.Type.CELL) continue;
+
+					// this strategy needs disjoint bi-value constraints
+					if (c3.getLength() != 2) continue;
+					if (c3.hits(c1)) continue;
+					if (c3.hits(c2)) continue;
 					
-					Node n1 = col1.head.down;
-					Node n2 = n1.down;
-					Node n3 = col2.head.down;
-					Node n4 = n3.down;
-					Node n5 = col3.head.down;
-					Node n6 = n5.down;
+					// get the candidates for these constraints
+					Candidate c11 = c1.getHead().getDown().getCandidate();
+					Candidate c12 = c1.getHead().getDown().getDown().getCandidate();
+					Candidate c21 = c2.getHead().getDown().getCandidate();
+					Candidate c22 = c2.getHead().getDown().getDown().getCandidate();
+					Candidate c31 = c3.getHead().getDown().getCandidate();
+					Candidate c32 = c3.getHead().getDown().getDown().getCandidate();
 					
-					// try n1, n2 as the hinge
-					checkConflicts(diagram, level, n1, n2, n3, n4, n5, n6, results);
-					checkConflicts(diagram, level, n1, n2, n3, n4, n6, n5, results);
-					checkConflicts(diagram, level, n1, n2, n4, n3, n5, n6, results);
-					checkConflicts(diagram, level, n1, n2, n4, n3, n6, n5, results);
+					// try c1 as the hinge
+					checkConflicts(puzzle, c11, c12, c21, c22, c31, c32, results);
+					checkConflicts(puzzle, c11, c12, c21, c22, c32, c31, results);
+					checkConflicts(puzzle, c11, c12, c22, c21, c31, c32, results);
+					checkConflicts(puzzle, c11, c12, c22, c21, c32, c31, results);
 					
-					// try n3, n4 as the hinge
-					checkConflicts(diagram, level, n3, n4, n1, n2, n5, n6, results);
-					checkConflicts(diagram, level, n3, n4, n1, n2, n6, n5, results);
-					checkConflicts(diagram, level, n3, n4, n2, n1, n5, n6, results);
-					checkConflicts(diagram, level, n3, n4, n2, n1, n6, n5, results);
+					// try c2 as the hinge
+					checkConflicts(puzzle, c21, c22, c11, c12, c31, c32, results);
+					checkConflicts(puzzle, c21, c22, c11, c12, c32, c31, results);
+					checkConflicts(puzzle, c21, c22, c12, c11, c31, c32, results);
+					checkConflicts(puzzle, c21, c22, c12, c11, c32, c31, results);
 					
-					// try n5, n6 as the hinge
-					checkConflicts(diagram, level, n5, n6, n1, n2, n3, n4, results);
-					checkConflicts(diagram, level, n5, n6, n1, n2, n4, n3, results);
-					checkConflicts(diagram, level, n5, n6, n2, n1, n3, n4, results);
-					checkConflicts(diagram, level, n5, n6, n2, n1, n4, n3, results);
+					// try c3 as the hinge
+					checkConflicts(puzzle, c31, c32, c11, c12, c21, c22, results);
+					checkConflicts(puzzle, c31, c32, c11, c12, c22, c21, results);
+					checkConflicts(puzzle, c31, c32, c12, c11, c21, c22, results);
+					checkConflicts(puzzle, c31, c32, c12, c11, c22, c21, results);
 					
 					if (results.size() > 0)
 						return results;
@@ -87,38 +120,45 @@ public class GenYWingStrategy implements Strategy {
 	}
 	
 	// see if these nodes form an XY-Wing shape
-	private void checkConflicts(Diagram diagram, int level,
-			Node n1, Node n2, Node n3, Node n4, Node n5, Node n6,
+	private void checkConflicts(Puzzle puzzle,
+			Candidate c11, Candidate c12,		// hinge
+			Candidate c21, Candidate c22,		// wing1
+			Candidate c31, Candidate c32,		// wing2
 			List<Result> actions) {
-		if (n1.row.intersects(n3.row) && n2.row.intersects(n5.row)) {
-			// yep, they do - so search the diagram for any rows that intersect
-			// both the rows containing n1 and n2 - they can be zapped
-			check(diagram, level, n4, n6, n1, n2, actions);
+		
+		// check if c11 eliminates c21 and c12 eliminates c31
+		if (c11.hits(c21) && c12.hits(c31)) {
+			// yes, so either c22 or c32 must be in the solution -
+			// any candidates eliminated by both of these can be removed
+			check(puzzle, c22, c32, c11, c12, actions);
 		}
 	}
 	
-	// we've determined that one of the 2 rows containing n1 and n2 must be
-	// in the solution, any other rows that conflict with both can be removed
-	private void check(Diagram diagram, int level,
-			Node n1, Node n2, Node hinge1, Node hinge2,
+	// we've determined that one of the 2 candidates containing n1 and n2 must be
+	// in the solution, any other candidates that conflict with both can be removed
+	private void check(Puzzle puzzle,
+			Candidate c1, Candidate c2, Candidate hinge1, Candidate hinge2,
 			List<Result> actions) {
-		Row r = diagram.rootRow.next;
 		boolean printed = false;
-		while (r != diagram.rootRow) {
-			if (r != n1.row && r != n2.row) {
-				if (r.intersects(n1.row) && r.intersects(n2.row)) {
-					if (!printed) {
-						LOG.info("Found generalised Y-Wing conflict: {} forces {} and {} forces {}",
-								hinge1.row.name, n1.row.name, hinge2.row.name, n2.row.name);
-						printed = true;
-					}
-					
-					actions.add(new CandidateRemovedResult(diagram, r.firstNode, level,
-							String.format("conflicts with Y-Wings at %s and %s - hinge at %s and %s",
-									n1.row.name, n2.row.name, hinge1.row.name, hinge2.row.name)));
+		for (Candidate r = puzzle.getRootCandidate().getNext();
+				r != puzzle.getRootCandidate();
+				r = r.getNext()) {
+			if (r == c1 || r == c2)
+				continue;
+			
+			if (r.hits(c1) && r.hits(c2)) {
+				if (!printed) {
+					LOG.info("Found generalised Y-Wing conflict: {} forces {} and {} forces {}",
+							hinge1.getName(), c1.getName(),
+							hinge2.getName(), c2.getName());
+					printed = true;
 				}
+				
+				actions.add(new CandidateRemovedResult(puzzle, r,
+						String.format("conflicts with Y-Wings at %s and %s - hinge at %s and %s",
+								c1.getName(), c2.getName(),
+								hinge1.getName(), hinge2.getName())));
 			}
-			r = r.next;
 		}
 	}
 }

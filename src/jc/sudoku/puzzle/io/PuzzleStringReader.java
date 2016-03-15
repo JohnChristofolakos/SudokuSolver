@@ -1,17 +1,19 @@
-package jc.sudoku.diagram.io;
+package jc.sudoku.puzzle.io;
 
 import static jc.sudoku.main.Utils.panic;
 
-public class DiagramStringReader extends DiagramReader {
+// A concrete subclass of DiagramReader that takes input
+// from an array of Strings, or from a single String.
+public class PuzzleStringReader extends PuzzleReader {
 	String[] lines;
 	
 	// can be constructed with an array of nine 9-character lines
-	public DiagramStringReader(String[] lines) {
+	public PuzzleStringReader(String[] lines) {
 		this.lines = lines;
 	}
 	
 	// can be constructed with an 81-character line
-	public DiagramStringReader(String line) {
+	public PuzzleStringReader(String line) {
 		lines = new String[1];
 		lines[0] = line;
 	}

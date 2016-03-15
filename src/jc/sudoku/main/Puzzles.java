@@ -4,8 +4,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.HashMap;
 
-// Contains a number oif canned puzzles for testing and amusement.
-//
+// Contains a number of canned puzzles for testing and amusement.
 public class Puzzles {
 	//	needs hidden unique rectangle strategy
 	private static final String[] hiddenUniqueRect = {
