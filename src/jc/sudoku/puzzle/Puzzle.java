@@ -1,10 +1,15 @@
 package jc.sudoku.puzzle;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
+
+import jc.dlx.diagram.INode;
+import jc.dlx.diagram.IRow;
 import jc.dlx.diagram.impl.Diagram;
 
 import static java.util.stream.Collectors.toList;
+
+import java.util.ArrayList;
 
 // Diagram representing a Sudoku problem in set cover form. 
 //
@@ -14,97 +19,151 @@ import static java.util.stream.Collectors.toList;
 // calling addHint. Or the hinted cells can be accounted for during the
 // initial construction of the diagram, as the original Knuth algorithm does.
 
-public class Puzzle {
+public class Puzzle extends Diagram {
 	public Puzzle() {
-		diagram = new Diagram(
+		super(
 			() -> { return new Constraint(new Hit(), "", 0, Constraint.Type.UNKNOWN); },
-			() -> { return new Candidate("", 0); }
+			() -> { return new Candidate("", 0, 0, 0, 0); }
 		);
 	}
-	
-	// most of the representation is in DLX diagram
-	private Diagram diagram;
-	
-	// dangerous getter, should be used only on puzzles to be solved by
-	// the DLX solver
-	public Diagram getDlxDiagram()		{ return diagram; }
 	
 	/////////////// Proxy various getters from the DLX diagram
 	
 	public Constraint getRootConstraint() {
-		return (Constraint)diagram.getRootColumn();
+		return (Constraint)getRootColumn();
 	}
 	public Candidate getRootCandidate()	{
-		return (Candidate)diagram.getRootRow();
+		return (Candidate)getRootRow();
 	}	
-	public List<Candidate> getHints() {
-		return diagram.getHints().stream().map(r -> (Candidate)r).collect(toList());
+	public List<Candidate> getSudokuHints() {
+		return getHints().stream().map(r -> (Candidate)r).collect(toList());
 	}
-	public List<Candidate> getSolution() {
-		return diagram.getSolution().stream().map(r -> (Candidate)r).collect(toList());
+	public List<Candidate> getSudokuSolution() {
+		return getSolution().stream().map(r -> (Candidate)r).collect(toList());
 	}
 	public List<Constraint> getActiveConstraints(int lenFilter) {
-		return diagram.getActiveColumns(lenFilter).stream()
+		return getActiveColumns(lenFilter).stream()
 				.map(r -> (Constraint)r).collect(toList());
 	}
 	public List<Constraint> getActiveConstraints() {
 		return getActiveConstraints(-1);
 	}
 	public List<Candidate> getActiveCandidates() {
-		return diagram.getActiveRows().stream()
+		return getActiveRows().stream()
 				.map(r -> { return (Candidate) r; }).collect(toList());
 	}
-	public int getConstraintCount()	{ return diagram.getColumnCount(); }
-	public int getCandidateCount()	{ return diagram.getRowCount(); }
-	public boolean isBlocked()		{ return diagram.isBlocked(); }
-	public boolean isSolved()		{ return diagram.isSolved(); }
+	public int getConstraintCount()	{ return getColumnCount(); }
+	public int getCandidateCount()	{ return getRowCount(); }
+	
+	///////////////// Overrides to add listener capability
+	
+	// Adds a domain-specific row to the diagram
+	@Override
+	public void addRow(IRow row, List<String> colNames,
+			Supplier<INode> nodeSupplier) {
+		super.addRow(row, colNames, nodeSupplier);
+		
+		listeners.forEach(l -> l.candidateAdded((Candidate)row));
+	}
+	
+	// Adds a hinted cell to the puzzle during initial setup
+	@Override
+	public Candidate addHint(String rowName) {
+		IRow r = super.addHint(rowName);
+		
+		listeners.stream().forEach(l -> l.candidateHinted((Candidate)r));
+		return (Candidate) r;
+	}
+
+	// remove this row from the row list
+	@Override
+	public void unlinkRow(IRow row) {
+		super.unlinkRow(row);
+		
+		listeners.stream().forEach(l -> l.candidateRemoved((Candidate) row));
+	}
+	
+	// restore this row into the row list
+	@Override
+	public void restoreRow(IRow row) {
+		super.restoreRow(row);
+		
+		listeners.stream().forEach(l -> l.candidateHinted((Candidate) row));
+	}
+
+	@Override
+	public void pushSolution(INode candidateSolved) {
+		super.pushSolution(candidateSolved);
+		listeners.stream().forEach(l -> l.candidateSolved(((Candidate)candidateSolved.getRow())));
+	}
+	
+	@Override
+	public INode popSolution() {
+		INode node = super.popSolution();
+		listeners.stream().forEach(l -> l.candidateUnsolved(((Candidate)node.getRow())));
+		return node;
+	}
+
+
 	
 	///////////////// Proxy the diagram setup methods
 	
 	// Adds a constraint to the puzzle during initial setup
 	public Constraint addConstraint(String name, Constraint.Type type) {
 		Hit head = new Hit();
-		Constraint col = new Constraint(head, name, diagram.getColumnCount() + 1, type);
-		diagram.addColumn(col);
+		Constraint col = new Constraint(head, name, getConstraintCount() + 1, type);
+		addColumn(col);
 		return col;
 	}
 	
 	// Adds a row to the puzzle during initial setup
-	public Candidate addCandidate(String name, List<String> constraintNames) {
-		Candidate row = new Candidate(name, diagram.getRowCount() + 1);
-		diagram.addRow(row, constraintNames, () -> { return new Hit(); });
-		return row;
+	public Candidate addCandidate(String name, List<String> constraintNames,
+			int digit, int row, int col) {
+		Candidate c = new Candidate(name, getCandidateCount() + 1, digit, row, col);
+		addRow(c, constraintNames, () -> { return new Hit(); });
+		
+		return c;
 	}
 	
-	// Adds a hinted cell to the puzzle during initial setup
-	public void addHint(String rowName) {
-		diagram.addHint(rowName);
-	}
-
 	///////////// Proxy the mutators needed by the logical strategies' results
 	
 	public int cover(Hit hit) {
-		int updates = diagram.cover(0, hit.getConstraint());
-		diagram.coverNodeColumns(0, hit);
+		int updates = cover(0, hit.getConstraint());
+		coverNodeColumns(0, hit);
 		return updates;
 	}
 	public void uncover(Hit hit) {
-		diagram.uncoverNodeColumns(hit);;
-		diagram.uncover(hit.getConstraint());
+		uncoverNodeColumns(hit);;
+		uncover(hit.getConstraint());
 	}
 	public int eliminateCandidate(Candidate c) {
-		return diagram.eliminateRow(c.getFirstNode());
+		return eliminateRow(c.getFirstNode());
 	}
 	public void restoreCandidate(Candidate c) {
-		diagram.restoreRow(c.getFirstNode());
+		restoreRow(c.getFirstNode());
 	}
-	public void pushSolution(Hit candidateSolved) {
-		diagram.pushSolution(candidateSolved);
+	public void pushSudokuSolution(Hit candidateSolved) {
+		pushSolution(candidateSolved);
 	}
-	public Hit popSolution() {
-		return (Hit)diagram.popSolution();
+	public Hit popSudokuSolution() {
+		return (Hit)popSolution();
 	}
 
+	////////////////// listener subscription management
+	
+	List<PuzzleListener> listeners = new ArrayList<>();
+	
+	// adds a listener to the subscribers list
+	public void addListener(PuzzleListener listener) {
+		listeners.add(listener);
+	}
+	
+	public void removeListener(PuzzleListener listener) {
+		listeners.remove(listener);
+	}
+	
+	////////////////// printing
+	
 	// Returns a (somewhat) human readable representation of the puzzle
 	public String toString() {
 		if (isSolved()) {
@@ -137,11 +196,11 @@ public class Puzzle {
 		}
 		
 		// show the hints in the center of their cells, surrounded by '*'
-		for (Candidate c : getHints())
+		for (Candidate c : getSudokuHints())
 			setSingleValue(board, c.getName(), '*');
 		
 		// show the solved cells in the center of their cells, surrounded by '+'
-		for (Candidate c : getSolution())
+		for (Candidate c : getSudokuSolution())
 			setSingleValue(board, c.getName(), '+');
 		
 		// show the candidates in a little matrix within their cell
@@ -172,9 +231,9 @@ public class Puzzle {
 			for (int i=0; i < 9; i++)
 					row[i] = ' ';
 			
-		for (Candidate c : getHints())
+		for (Candidate c : getSudokuHints())
 			setBoardSolved(board, c.getName());
-		for (Candidate c : getSolution())
+		for (Candidate c : getSudokuSolution())
 			setBoardSolved(board, c.getName());
 		
 		StringBuilder sb = new StringBuilder();

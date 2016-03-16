@@ -92,7 +92,7 @@ public interface IDiagram {
 
 	// Used to specify the hinted cells for this diagram. Call this after adding
 	// all the columns and rows.
-	public void addHint(String rowName);
+	public IRow addHint(String rowName);
 	
 	/////////////// mutating routines used during solving - all are reversible
 	

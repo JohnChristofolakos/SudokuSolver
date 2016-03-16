@@ -22,7 +22,7 @@ public class LogicalSolverTest {
 		reader.generate(puzzle);
 		reader = null;
 		
-		DlxSolver solver = new DlxSolver(puzzle.getDlxDiagram());
+		DlxSolver solver = new DlxSolver(puzzle);
 		int count = solver.solve();
 		if (count != 1)
 			fail("DLX solver reports " + count + " solutions");

@@ -19,11 +19,22 @@ public class Constraint extends Column {
 	}
 	
 	public enum Type {
-		UNKNOWN,
-		CELL,
-		ROW,
-		COLUMN,
-		BOX
+		UNKNOWN("unknown"),
+		CELL("cell"),
+		ROW("row"),
+		COLUMN("column"),
+		BOX("box");
+		
+		private String name;
+		
+		private Type(String name) {
+			this.name = name;
+		}
+		
+		@Override
+		public String toString() {
+			return name;
+		}
 	};
 	private Type type;
 	

@@ -67,11 +67,17 @@ public class NakedTriplesStrategy implements Strategy {
 					// put the nodes for these constraints into a 2D array
 					Hit[][] hits = StreamUtil.buildHitsArray(c1, c2, c3);
 					
-					// At least one of the constraints must have 3 hits, or
-					// the naked triple would just be 3 naked pairs. buildHitsArray
-					// creates a non-ragged array, so we can just check the first row.
-					if (hits[0].length == 3)
-						checkConflicts(puzzle, hits, 0, results);
+					// we need to fill out short rows to 3 elements
+					for (int i = 0; i < 3; i++) {
+						if (hits[i].length == 2) {
+							Hit[] newHits = new Hit[3];
+							System.arraycopy(hits[i], 0, newHits, 0, 2);
+							newHits[2] = null;
+							hits[i] = newHits;
+						}
+					}
+					
+					checkConflicts(puzzle, hits, 0, results);
 					
 					if (results.size() > 0)
 						return results;

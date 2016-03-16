@@ -13,15 +13,15 @@ import jc.sudoku.puzzle.Constraint;
 import jc.sudoku.puzzle.Puzzle;
 import jc.sudoku.solver.logical.Result;
 
-// This strategy looks for a generalised Y-Wing (also called XY-Wing) - for example
-// the 'hinge' may be a pair of cells H1 with candidates (a,x) and H2 with (a, y)
-// that contain the last two possibilities for candidate a in a unit. Then if
-// W1 = (a,c) sees H1 and W2 = (a,c) sees H2, then either W1 or W2 must be c.
-// So c can be removed from all cells that can see both W1 and W2.
+// This strategy looks for an XY-Wing - for example the 'hinge' may be a pair
+// of cells H1 with candidates (a,x) and H2 with (a, y) that contain the last
+// two possibilities for candidate a in a unit. Then if W1 = (a,c) hits H1 and
+// W2 = (a,c) hits H2, then either W1 or W2 must be c. So c can be removed from
+// all cells that are hit by both W1 and W2.
 //
 // The same reasoning holds if x=c and H1 and W1 contain the last two candidates
 // for c in some unit. If H1 is a, then W1 must be c. Otherwise, H2 must be a, and
-// so W2 must be c. So again, c can be removed from cells that see W1 and W2. 
+// so W2 must be c. So again, c can be removed from cells that are hit by W1 and W2. 
 //
 // In terms of the set cover representation, this is c1 = {r1,r2}, c2 = {r3,r4},
 // c3 = {r5,r6} all disjoint, where intersect(r1,r3) and intersect(r2,r5) are both
@@ -32,17 +32,17 @@ import jc.sudoku.solver.logical.Result;
 // are not restricted to bi-value cell-type constraints, they may be constraints
 // on rows, columns, or boxes.
 //
-// The implementation will by default find generalised Y-Wings (XY-Wings), or will
-// find Y-Wings if constructed with the limitToCells parameter set to true.
+// The implementation will by default find XY-Wings, or will restrict the search
+// to find only Y-Wings if constructed with the limitToCells parameter set to true.
 //
-public class GenYWingStrategy implements Strategy {	
-	private static Logger LOG = LoggerFactory.getLogger(GenYWingStrategy.class);
+public class XYWingStrategy implements Strategy {	
+	private static Logger LOG = LoggerFactory.getLogger(XYWingStrategy.class);
 
-	public GenYWingStrategy() {
+	public XYWingStrategy() {
 		this(false);
 	}
 	
-	public GenYWingStrategy(boolean limitToCells) {
+	public XYWingStrategy(boolean limitToCells) {
 		this.limitToCells = limitToCells;
 	}
 	
@@ -51,7 +51,7 @@ public class GenYWingStrategy implements Strategy {
 	@Override
 	public List<Result> findResults(Puzzle puzzle) {
 		List<Result> results = new ArrayList<Result>();
-		LOG.info("Trying GenYWingStrategy");
+		LOG.info("Trying {}YWing Strategy", limitToCells ? "" : "X");
 		
 		// loop through the combinations for c1, c2, c3
 		for (Constraint c1 = puzzle.getRootConstraint().getNext();
@@ -67,7 +67,7 @@ public class GenYWingStrategy implements Strategy {
 					c2 != puzzle.getRootConstraint();
 					c2 = c2.getNext()) {
 				// optionally may be limited to cell type constraints
-				if (limitToCells && c1.getType() != Constraint.Type.CELL) continue;
+				if (limitToCells && c2.getType() != Constraint.Type.CELL) continue;
 
 				// this strategy needs disjoint bi-value constraints
 				if (c2.getLength() != 2) continue;
@@ -78,7 +78,7 @@ public class GenYWingStrategy implements Strategy {
 						c3 != puzzle.getRootConstraint();
 						c3 = c3.getNext()) {
 					// optionally may be limited to cell type constraints
-					if (limitToCells && c1.getType() != Constraint.Type.CELL) continue;
+					if (limitToCells && c3.getType() != Constraint.Type.CELL) continue;
 
 					// this strategy needs disjoint bi-value constraints
 					if (c3.getLength() != 2) continue;
@@ -132,6 +132,12 @@ public class GenYWingStrategy implements Strategy {
 			// any candidates eliminated by both of these can be removed
 			check(puzzle, c22, c32, c11, c12, actions);
 		}
+		// or maybe c11 eliminates c31 and c12 eliminates c21
+		if (c11.hits(c31) && c12.hits(c21)) {
+			// yes, so either c22 or c32 must be in the solution -
+			// any candidates eliminated by both of these can be removed
+			check(puzzle, c22, c32, c11, c12, actions);
+		}
 	}
 	
 	// we've determined that one of the 2 candidates containing n1 and n2 must be
@@ -148,14 +154,16 @@ public class GenYWingStrategy implements Strategy {
 			
 			if (r.hits(c1) && r.hits(c2)) {
 				if (!printed) {
-					LOG.info("Found generalised Y-Wing conflict: {} forces {} and {} forces {}",
+					LOG.info("Found {}Y-Wing conflict: {} forces {} and {} forces {}",
+							limitToCells ? "" : "X",
 							hinge1.getName(), c1.getName(),
 							hinge2.getName(), c2.getName());
 					printed = true;
 				}
 				
 				actions.add(new CandidateRemovedResult(puzzle, r,
-						String.format("conflicts with Y-Wings at %s and %s - hinge at %s and %s",
+						String.format("conflicts with %sY-Wings at %s and %s - hinge at %s and %s",
+								limitToCells ? "" : "X",
 								c1.getName(), c2.getName(),
 								hinge1.getName(), hinge2.getName())));
 			}

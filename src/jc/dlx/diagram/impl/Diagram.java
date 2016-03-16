@@ -11,6 +11,7 @@ import jc.dlx.diagram.IColumn;
 import jc.dlx.diagram.IDiagram;
 import jc.dlx.diagram.INode;
 import jc.dlx.diagram.IRow;
+import jc.sudoku.puzzle.Candidate;
 
 import static java.util.stream.Collectors.toList;
 
@@ -249,7 +250,7 @@ public class Diagram implements IDiagram {
 	// Specifies the hinted cells for this diagram. Call this after adding
 	// all the columns and rows.
 	@Override
-	public void addHint(String rowName) {
+	public IRow addHint(String rowName) {
 		// find the specified row
 		for (IRow r = rootRow.getNext(); r != rootRow; r = r.getNext()) {
 			if (r.getName().equals(rowName)) {
@@ -259,8 +260,10 @@ public class Diagram implements IDiagram {
 				
 				// remember the hints for printing later
 				hints.add(r);
+				return r;
 			}
 		}
+		return null;
 	}
 	
 	/////////////// mutating routines used during solving - all are reversible
@@ -290,8 +293,7 @@ public class Diagram implements IDiagram {
 			}
 			
 			// remove the node's row from the rows list
-			rr.getRow().unlinkFromRowList();
-			rowCount--;
+			unlinkRow(rr.getRow());
 		}
 		return k;
 	}
@@ -308,8 +310,7 @@ public class Diagram implements IDiagram {
 			}
 			
 			// add the row back into the rows list
-			rr.getRow().relinkIntoRowList();
-			rowCount++;
+			restoreRow(rr.getRow());
 		}
 
 		// link the column back into the columns list
@@ -335,7 +336,19 @@ public class Diagram implements IDiagram {
 			uncover(n.getColumn());
 	}
 	
-	// Removes a row that has been eliminate by the logical solver
+	// remove this row from the row list
+	public void unlinkRow(IRow row) {
+		row.unlinkFromRowList();
+		rowCount--;
+	}
+	
+	// restore this row into the row list
+	public void restoreRow(IRow row) {
+		row.relinkIntoRowList();
+		rowCount++;
+	}
+
+	// Removes a row that has been eliminated by the logical solver
 	@Override
 	public int eliminateRow(INode node) {
 		// unlink the row's nodes from their columns
@@ -348,8 +361,7 @@ public class Diagram implements IDiagram {
 		} while (rr != node);
 		
 		// unlink the row from the row list
-		node.getRow().unlinkFromRowList();
-		rowCount--;
+		unlinkRow(node.getRow());
 		
 		return k;
 	}
@@ -370,8 +382,7 @@ public class Diagram implements IDiagram {
 		} while (rr != node); 
 		
 		// link the row back into the row list
-		node.getRow().relinkIntoRowList();
-		rowCount++;
+		restoreRow(rr.getRow());
 		
 		return k;
 	}

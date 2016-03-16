@@ -8,8 +8,8 @@ import org.slf4j.LoggerFactory;
 import jc.sudoku.puzzle.Candidate;
 import jc.sudoku.puzzle.Puzzle;
 import jc.sudoku.solver.Solver;
-import jc.sudoku.solver.logical.strategies.GenYWingStrategy;
-import jc.sudoku.solver.logical.strategies.GenYWingStrategyStreamed;
+import jc.sudoku.solver.logical.strategies.XYWingStrategy;
+import jc.sudoku.solver.logical.strategies.XYWingStrategyStreamed;
 import jc.sudoku.solver.logical.strategies.HiddenUniqueRectStrategy;
 import jc.sudoku.solver.logical.strategies.LockedSetsStrategy;
 import jc.sudoku.solver.logical.strategies.NakedPairsStrategy;
@@ -71,11 +71,11 @@ public class LogicalSolver implements Solver {
 			{ new NakedTriplesStrategy(), null },
 			{ new UniqueRectStrategy(), null },
 			{ new HiddenUniqueRectStrategy(), null },
-			{ new GenYWingStrategy(), new GenYWingStrategyStreamed() },
+			{ new XYWingStrategy(), new XYWingStrategyStreamed() },
 	};
 
 	// tries the strategies in order until one of the returns non-empty results
-	private List<Result> findStrategy() {
+	public List<Result> findStrategy() {
 		List<Result> results;
 		for (Strategy[] s : strategies) {
 			if (useStreamed && s[1] != null)
@@ -94,11 +94,11 @@ public class LogicalSolver implements Solver {
 		count++;
 		if (LOG.isInfoEnabled()) {
 			LOG.info("=== Solution {}:\n", count);
-			for (Candidate row : puzzle.getSolution())
+			for (Candidate row : puzzle.getSudokuSolution())
 				LOG.info(row.toString());
 		}
 	}
-
+	
 	// Tries to solve the puzzle using the logical strategies. For now,
 	// if none of them return any results, it gives up.
 	public int solve() {

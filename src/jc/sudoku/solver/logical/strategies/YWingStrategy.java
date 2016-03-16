@@ -23,7 +23,7 @@ import jc.sudoku.solver.logical.Result;
 //
 public class YWingStrategy implements Strategy {	
 	public YWingStrategy() {
-		strategy = new GenYWingStrategy(true);		// limit to cells
+		strategy = new XYWingStrategy(true);		// limit to cells
 	}
 	private Strategy strategy;
 	

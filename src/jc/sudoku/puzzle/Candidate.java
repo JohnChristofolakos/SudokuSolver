@@ -6,15 +6,27 @@ import jc.dlx.diagram.impl.Row;
 // Sudoku cell.
 //
 public class Candidate extends Row {
-	public Candidate(String name, int num) {
+	public Candidate(String name, int num, int digit, int row, int col) {
 		super(name);
 		this.num = num;
+		this.digit = digit;
+		this.row = row;
+		this.col = col;
 	}
 
 	// row number, increasing as 'next' links are followed
 	private int num;					 
 	public int getNumber()				{ return this.num; }
 	
+	// the digit this candidate represents
+	private int digit;
+	public int getDigit() 				{ return digit; }
+	
+	// the Sudoku row and column number this candidate represents
+	private int row, col;
+	public int getRow() 				{ return row; }
+	public int getColumn() 				{ return col; }
+
 	// override base class getters to avoid have to cast everywhere
 	@Override
 	public Candidate getPrev()			{ return (Candidate)super.getPrev(); }
@@ -28,7 +40,7 @@ public class Candidate extends Row {
 	// returns the list of hits indicating the constraints where this
 	// candidate conflicts with the passed-in candidate
 	public Candidate sharedHits(Candidate c) {
-		Candidate hits = new Candidate("", 0);
+		Candidate hits = new Candidate("", 0, 0, 0, 0);
 		
 		if (this.getFirstHit() == null || c.getFirstHit() == null)
 			return hits;

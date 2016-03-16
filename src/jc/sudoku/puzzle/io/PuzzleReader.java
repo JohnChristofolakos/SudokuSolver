@@ -112,7 +112,7 @@ public abstract class PuzzleReader {
 			hits.add("b" + x + d);		// hits digit d in box x 
 			
 			// add the row to the diagram
-			diagram.addCandidate("r" + r + "c" + c + "d" + d, hits);
+			diagram.addCandidate("r" + r + "c" + c + "d" + d, hits, d, r, c);
 		}
 	}
 

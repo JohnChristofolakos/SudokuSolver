@@ -123,6 +123,19 @@ public class Puzzles {
 			"9.....1..",
 	};
 
+	// has XYZ-wing
+	private static final String xyzWing[] = {
+			".9578264.",
+			"..2631589",
+			"6.85497.2",
+			"2.9...36.",
+			"..62..9..",
+			".5.96.128",
+			"9.3.264..",
+			".2..9.8.6",
+			".6...729.",
+	};
+
 	static Map<String, String[]> puzzles = new HashMap<>();
 	
 	static {
@@ -135,6 +148,7 @@ public class Puzzles {
 		puzzles.put("genYWing", genYWing);
 		puzzles.put("test", test);
 		puzzles.put("xWings", xWings);
+		puzzles.put("xyzWing", xyzWing);
 	}
 	
 	public static String[] getPuzzle(String name) {
