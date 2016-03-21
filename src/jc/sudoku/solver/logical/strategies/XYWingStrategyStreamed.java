@@ -1,20 +1,28 @@
 package jc.sudoku.solver.logical.strategies;
 
+import static jc.sudoku.view.SudokuViewConsts.*;
+import static jc.sudoku.puzzle.Constraint.UnitType.*;
+import static jc.sudoku.solver.logical.hinting.HintRefType.*;
+import static jc.sudoku.solver.logical.streams.StreamUtil.permute;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jc.sudoku.solver.logical.Result;
 import jc.sudoku.solver.logical.Strategy;
-import jc.sudoku.solver.logical.results.CandidateRemovedResult;
+import jc.sudoku.solver.logical.hinting.HintBuilder;
 import jc.sudoku.solver.logical.streams.StreamUtil;
 import jc.sudoku.puzzle.Candidate;
 import jc.sudoku.puzzle.Constraint;
 import jc.sudoku.puzzle.Hit;
 import jc.sudoku.puzzle.Puzzle;
-import jc.sudoku.solver.logical.Result;
+import jc.sudoku.puzzle.action.Action;
+import jc.sudoku.puzzle.action.impl.CandidateRemovedAction;
 
 // This strategy looks for an XY-Wing - for example the 'hinge' may be a pair
 // of cells H1 with candidates (a,x) and H2 with (a, y) that contain the last
@@ -55,33 +63,32 @@ public class XYWingStrategyStreamed implements Strategy {
 	private boolean limitToCells;
 	
 	@Override
-	public List<Result> findResults(Puzzle puzzle) {
+	public Optional<Result> findResult(Puzzle puzzle) {
 		LOG.info("Trying {}YWingStrategyStreamed", limitToCells ? "" : "X");
 		
-		Optional<List<Result>> results =
+		Optional<Result> optResult =
 				// get all combinations of three constraints having 2 hits each
 				StreamUtil.choose(puzzle.getActiveConstraints(2), 3)
 				
 				// optionally, the constraints must all be of 'cell' type
 				.filter(constraints -> !limitToCells ||
-						(constraints.get(0).getType() == Constraint.Type.CELL &&
-						 constraints.get(1).getType() == Constraint.Type.CELL &&
-						 constraints.get(2).getType() == Constraint.Type.CELL))
+						(constraints.get(0).getType() == CELL &&
+						 constraints.get(1).getType() == CELL &&
+						 constraints.get(2).getType() == CELL))
 				
 				// the three constraints must be disjoint
 				.filter(constraints -> !constraints.get(0).hits(constraints.get(1)))
 				.filter(constraints -> !constraints.get(0).hits(constraints.get(2)))
 				.filter(constraints -> !constraints.get(1).hits(constraints.get(2)))
 
-				// collect the hits from these constraints into a list of two hit lists
-				.<List<List<Hit>>> map(constraints
-								-> StreamUtil.collectConstraintHits(constraints))
+				// check all permututations
+				.<List<Constraint>> flatMap(constraints -> permute(constraints))
 				
 				// parallelise the checking
 				.parallel()
 				
 				// check for Y-Wings
-				.map(ll -> checkYWing(puzzle, ll))
+				.<Optional<Result>> map(constraints -> checkXYWing(puzzle, constraints))
 
 				// filter out the failed checks and map away the optional
 				.filter(o -> o.isPresent()).map(o -> o.get())
@@ -89,102 +96,161 @@ public class XYWingStrategyStreamed implements Strategy {
 				// bingo!
 				.findAny();
 		
-		if (results.isPresent()) {
-			return results.get();
-		} else {
-			return new ArrayList<Result>(0);
-		}
+		return optResult;
 	}
 
-	private Optional<List<Result>> checkYWing(Puzzle puzzle,
-			List<List<Hit>> hits) {
-		List<Result> results = new ArrayList<>();
-		
-		// get the candidates for these constraints
-		Candidate c11 = hits.get(0).get(0).getCandidate();
-		Candidate c12 = hits.get(0).get(1).getCandidate();
-		Candidate c21 = hits.get(1).get(0).getCandidate();
-		Candidate c22 = hits.get(1).get(1).getCandidate();
-		Candidate c31 = hits.get(2).get(0).getCandidate();
-		Candidate c32 = hits.get(2).get(1).getCandidate();
-		LOG.trace("Checking YWing hinge at ({}, {}) in {}, wings at ({}, {}) in {} and  ({}, {}) in {}",
-				c11.getName(), c12.getName(), hits.get(0).get(0).getConstraint().getName(),
-				c21.getName(), c22.getName(), hits.get(1).get(0).getConstraint().getName(),
-				c31.getName(), c32.getName(), hits.get(2).get(0).getConstraint().getName()
-				);
-		
-		// try c1 as the hinge
-		checkConflicts(puzzle, c11, c12, c21, c22, c31, c32, results);
-		checkConflicts(puzzle, c11, c12, c21, c22, c32, c31, results);
-		checkConflicts(puzzle, c11, c12, c22, c21, c31, c32, results);
-		checkConflicts(puzzle, c11, c12, c22, c21, c32, c31, results);
-		
-		// try c2 as the hinge
-		checkConflicts(puzzle, c21, c22, c11, c12, c31, c32, results);
-		checkConflicts(puzzle, c21, c22, c11, c12, c32, c31, results);
-		checkConflicts(puzzle, c21, c22, c12, c11, c31, c32, results);
-		checkConflicts(puzzle, c21, c22, c12, c11, c32, c31, results);
-		
-		// try c3 as the hinge
-		checkConflicts(puzzle, c31, c32, c11, c12, c21, c22, results);
-		checkConflicts(puzzle, c31, c32, c11, c12, c22, c21, results);
-		checkConflicts(puzzle, c31, c32, c12, c11, c21, c22, results);
-		checkConflicts(puzzle, c31, c32, c12, c11, c22, c21, results);
-		
-		if (results.isEmpty())
-			return Optional.empty();
-		else
-			return Optional.of(results);
-	}
-
-	// see if these nodes form an XY-Wing shape
-	private void checkConflicts(Puzzle puzzle,
-			Candidate c11, Candidate c12,		// hinge
-			Candidate c21, Candidate c22,		// wing1
-			Candidate c31, Candidate c32,		// wing2
-			List<Result> actions) {
-		
-		// check if c11 eliminates c21 and c12 eliminates c31
-		if (c11.hits(c21) && c12.hits(c31)) {
-			// yes, so either c22 or c32 must be in the solution -
-			// any candidates eliminated by both of these can be removed
-			check(puzzle, c22, c32, c11, c12, actions);
-		}
-		// or maybe c11 eliminates c31 and c12 eliminates c21
-		if (c11.hits(c31) && c12.hits(c21)) {
-			// yes, so either c22 or c32 must be in the solution -
-			// any candidates eliminated by both of these can be removed
-			check(puzzle, c22, c32, c11, c12, actions);
-		}
+	private void swap(Hit[] hits, int i, int j) {
+		Hit temp = hits[i];
+		hits[i] = hits[j];
+		hits[j] = temp;
 	}
 	
-	// we've determined that one of the 2 candidates containing n1 and n2 must be
-	// in the solution, any other candidates that conflict with both can be removed
-	private void check(Puzzle puzzle,
-			Candidate c1, Candidate c2, Candidate hinge1, Candidate hinge2,
-			List<Result> actions) {
+	// see if these constraints can form an XY-Wing shape
+	private Optional<Result> checkXYWing(Puzzle puzzle,
+			List<Constraint> constraints) {
+		Optional<Result> optResult = Optional.empty();
+		
+		Constraint hinge = constraints.get(0);
+		Constraint wing1 = constraints.get(1);
+		Constraint wing2 = constraints.get(2);
+		
+		// get the hits from these constraints into a 2D array
+		Hit[][] hits = StreamUtil.buildHitsArray(hinge, wing1, wing2);
+		
+		// try each possible wing configuration - first check 0 1 and 0 1
+		if ((optResult = checkAlignment(puzzle, hinge, wing1, wing2, hits)).isPresent()) return optResult;
+		swap(hits[2], 0, 1); 	// next check 0 1 and 1 0
+		if ((optResult = checkAlignment(puzzle, hinge, wing1, wing2, hits)).isPresent()) return optResult;
+		swap(hits[1], 0, 1);	// next check 1 0 and 1 0
+		if ((optResult = checkAlignment(puzzle, hinge, wing1, wing2, hits)).isPresent()) return optResult;
+		swap(hits[2], 0, 1);	// next check 1 0 and 1 0
+		if ((optResult = checkAlignment(puzzle, hinge, wing1, wing2, hits)).isPresent()) return optResult;
+		
+		return  Optional.empty();
+	}
+	
+	// see if these hits have the proper alignment for an XY-Wing shape
+	private Optional<Result> checkAlignment(Puzzle puzzle,
+			Constraint hinge, Constraint wing1, Constraint wing2,
+			Hit[][] hits) {
+		Optional<Result> optResult;
+		
+		// check if hinge[0] eliminates wing1[0] and hinge[1] eliminates wing2[0]
+		if (hits[0][0].getCandidate().hits(hits[1][0].getCandidate()) &&
+			hits[0][1].getCandidate().hits(hits[2][0].getCandidate())) {
+			// yes, so either wing1[1] or wing2[1] must be in the solution -
+			// any candidates eliminated by both of these can be removed
+			optResult = checkConflicts(puzzle, hinge, wing1, wing2, hits);
+			if (optResult.isPresent())
+				return optResult;
+		}
+		
+		return Optional.empty();
+	}
+	
+	// we've determined that one of the 2 candidates containing hits[1][1] and
+	// hits[2][1] must be in the solution, any other candidates that conflict
+	// with both can be removed
+	private Optional<Result> checkConflicts(Puzzle puzzle,
+			Constraint hinge, Constraint wing1, Constraint wing2,
+			Hit[][] hits) {
+
+		HintBuilder hintBuilder = new HintBuilder();
+		
+		// first hint
+		if (hinge.getType() == CELL && wing1.getType() == CELL && wing2.getType() == CELL)
+			hintBuilder.addText("There is a Y-Wing ...");
+		else
+			hintBuilder.addText("There is an XY-Wing ...");
+		hintBuilder.newHint();
+		
+		// second hint
+		hintBuilder.addText("Check the cells ")
+				.addHintRefs(CELL_NAME,
+						hinge.getType() == CELL
+							? Arrays.asList(hits[0][0], hits[1][0], hits[2][0])
+							: Arrays.asList(hits[0][0], hits[0][1], hits[1][0], hits[2][0]),
+						HIGHLIGHT_GREEN)
+				.newHint()
+				.addText("Candidates ")
+				.addHintRef(CANDIDATE_NAME, hits[0][0], HIGHLIGHT_GREEN)
+				.addText(" and ")
+				.addHintRef(CANDIDATE_NAME,  hits[0][1], HIGHLIGHT_BLUE);
+		if (hinge.getType() == CELL) {
+			hintBuilder.addText(" are the last two values in their cell");
+		} else {
+			hintBuilder.addText(String.format(" are the last two possibilities for a %d in their ",
+									hits[0][0].getCandidate().getDigit()))
+					.addHintRef(UNIT_TYPE, hits[0][0], HIGHLIGHT_GREEN);
+		}
+		hintBuilder.addText(", so one of them must be in the solution.\n\n")
+				.addHintRef(CANDIDATE_NAME, hits[0][0], HIGHLIGHT_GREEN)
+				.addText(" forces ")
+				.addHintRef(CANDIDATE_NAME, hits[1][1], HIGHLIGHT_GREEN)
+				.addText(" by eliminating ")
+				.addHintRef(CANDIDATE_NAME,  hits[1][0], HIGHLIGHT_YELLOW)
+				.addText(" from ")
+				.addHintRef(UNIT_TYPE_AND_NAME, hits[1][1], HIGHLIGHT_GREEN)
+				.addText(" and ")
+				.addHintRef(CANDIDATE_NAME,  hits[0][1], HIGHLIGHT_BLUE)
+				.addText(" forces ")
+				.addHintRef(CANDIDATE_NAME, hits[2][1], HIGHLIGHT_BLUE)
+				.addText(" by eliminating ")
+				.addHintRef(CANDIDATE_NAME,  hits[2][0], HIGHLIGHT_YELLOW)
+				.addText(" from ")
+				.addHintRef(UNIT_TYPE_AND_NAME, hits[2][1], HIGHLIGHT_BLUE)
+				.newHint();
+
+		// start off the third hint
+		hintBuilder.addText("Either ")
+				.addHintRef(CANDIDATE_NAME, hits[1][1], HIGHLIGHT_GREEN)
+				.addText(" or ")
+				.addHintRef(CANDIDATE_NAME, hits[2][1], HIGHLIGHT_BLUE)
+				.addText(" must be in the solution; the following candidates which conflict " +
+						"with both can be removed:\n");
+
+		List<Action> actions = new ArrayList<>();
 		boolean printed = false;
 		for (Candidate r = puzzle.getRootCandidate().getNext();
 				r != puzzle.getRootCandidate();
 				r = r.getNext()) {
-			if (r == c1 || r == c2)
+			if (r == hits[1][1].getCandidate() || r == hits[2][1].getCandidate())
 				continue;
 			
-			if (r.hits(c1) && r.hits(c2)) {
+			Candidate conflict1 = r.sharedHits(hits[1][1].getCandidate());
+			Candidate conflict2 = r.sharedHits(hits[2][1].getCandidate()); 
+			if (conflict1.getLength() > 0 && conflict2.getLength() > 0) {
 				if (!printed) {
 					LOG.info("Found {}Y-Wing conflict: {} forces {} and {} forces {}",
 							limitToCells ? "" : "X",
-							hinge1.getName(), c1.getName(),
-							hinge2.getName(), c2.getName());
+							hits[0][0].getCandidate().getName(), hits[1][1].getCandidate().getName(),
+							hits[0][1].getCandidate().getName(), hits[1][1].getCandidate().getName());
 					printed = true;
 				}
 				
-				actions.add(new CandidateRemovedResult(puzzle, r,
+				hintBuilder.addText("- ")
+						.addHintRef(CANDIDATE_NAME, r.getFirstHit(), HIGHLIGHT_YELLOW)
+						.addText("conflicts with ")
+						.addHintRef(CANDIDATE_NAME, hits[1][1], HIGHLIGHT_GREEN)
+						.addText(" in ")
+						.addHintRef(UNIT_TYPE_AND_NAME, conflict1.getFirstHit(), HIGHLIGHT_YELLOW)
+						.addText(" and with ")
+						.addHintRef(CANDIDATE_NAME, hits[2][1], HIGHLIGHT_BLUE)
+						.addText(" in ")
+						.addHintRef(UNIT_TYPE_AND_NAME, conflict2.getFirstHit(), HIGHLIGHT_YELLOW)
+						;
+				actions.add(new CandidateRemovedAction(puzzle, r.getFirstHit(),
 						String.format("conflicts with %sY-Wings at %s and %s - hinge at %s and %s",
 								limitToCells ? "" : "X",
-								c1.getName(), c2.getName(),
-								hinge1.getName(), hinge2.getName())));
+								hits[1][1].getCandidate().getName(), hits[1][1].getCandidate().getName(),
+								hits[0][0].getCandidate().getName(), hits[0][1].getCandidate().getName())));
 			}
+		}
+		
+		if (actions.size() > 0) {
+			return Optional.of(new Result(hintBuilder.getHints(), hintBuilder.getMarkups(), actions));
+		} else {
+			return Optional.empty();
 		}
 	}
 }

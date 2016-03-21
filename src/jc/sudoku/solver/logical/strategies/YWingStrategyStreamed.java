@@ -1,10 +1,10 @@
 package jc.sudoku.solver.logical.strategies;
 
-import java.util.List;
+import java.util.Optional;
 
+import jc.sudoku.solver.logical.Result;
 import jc.sudoku.solver.logical.Strategy;
 import jc.sudoku.puzzle.Puzzle;
-import jc.sudoku.solver.logical.Result;
 
 // This strategy looks for Y-Wings - a set of three cells with two candidates
 // each: H = (a,b), W1 = (b,c), W2 = (a,c). Then if H sees W1 and W2, then either
@@ -28,7 +28,7 @@ public class YWingStrategyStreamed implements Strategy {
 	private Strategy strategy;
 	
 	@Override
-	public List<Result> findResults(Puzzle puzzle) {
-		return strategy.findResults(puzzle);
+	public Optional<Result> findResult(Puzzle puzzle) {
+		return strategy.findResult(puzzle);
 	}
 }

@@ -1,6 +1,6 @@
 package jc.sudoku.solver.logical;
 
-import java.util.List;
+import java.util.Optional;
 
 import jc.sudoku.puzzle.Puzzle;
 
@@ -12,10 +12,11 @@ import jc.sudoku.puzzle.Puzzle;
 // A strategy should not modify the puzzle in any way.
 //
 // Most strategies should return only one application of their strategy
-// for each call to findResults. Some of the very simplest strategies may
-// return results for multiple applications of the strategy.
+// for each call to findResult. Some of the very simplest strategies may
+// return results for multiple applications of the strategy, taking care
+// not to remove or solve the same candidate twice.
+
 @FunctionalInterface
 public interface Strategy {
-	// TODO nicer if this returns an Optional<List<Result>>
-	List<Result> findResults(Puzzle puzzle);
+	Optional<Result> findResult(Puzzle puzzle);
 }

@@ -22,10 +22,14 @@ import java.util.ArrayList;
 public class Puzzle extends Diagram {
 	public Puzzle() {
 		super(
-			() -> { return new Constraint(new Hit(), "", 0, Constraint.Type.UNKNOWN); },
+			() -> { return new Constraint(new Hit(), "", 0, Constraint.UnitType.UNKNOWN, ""); },
 			() -> { return new Candidate("", 0, 0, 0, 0); }
 		);
 	}
+	
+	public final static String[] rowNames = {"A", "B", "C", "D", "E", "F", "G", "H", "I"};
+	public final static String[] colNames = {"1", "2", "3", "4", "5", "6", "7", "8", "9"};
+	public final static String[] boxNames = {"TL", "TC", "TR", "CL", "CC", "CR", "BL", "BC", "BR"};
 	
 	/////////////// Proxy various getters from the DLX diagram
 	
@@ -109,9 +113,9 @@ public class Puzzle extends Diagram {
 	///////////////// Proxy the diagram setup methods
 	
 	// Adds a constraint to the puzzle during initial setup
-	public Constraint addConstraint(String name, Constraint.Type type) {
+	public Constraint addConstraint(String name, Constraint.UnitType type, String unitName) {
 		Hit head = new Hit();
-		Constraint col = new Constraint(head, name, getConstraintCount() + 1, type);
+		Constraint col = new Constraint(head, name, getConstraintCount() + 1, type, unitName);
 		addColumn(col);
 		return col;
 	}
@@ -197,17 +201,17 @@ public class Puzzle extends Diagram {
 		
 		// show the hints in the center of their cells, surrounded by '*'
 		for (Candidate c : getSudokuHints())
-			setSingleValue(board, c.getName(), '*');
+			setSingleValue(board,  c.getRow(), c.getColumn(), c.getDigit(), '*');
 		
 		// show the solved cells in the center of their cells, surrounded by '+'
 		for (Candidate c : getSudokuSolution())
-			setSingleValue(board, c.getName(), '+');
+			setSingleValue(board,  c.getRow(), c.getColumn(), c.getDigit(), '+');
 		
 		// show the candidates in a little matrix within their cell
 		for (Candidate c = getRootCandidate().getNext();
 				c != getRootCandidate();
 				c = c.getNext()) {
-			setCandidate(board, c.getName());
+			setCandidate(board,  c.getRow(), c.getColumn(), c.getDigit());
 		}
 
 		StringBuilder sb = new StringBuilder();
@@ -220,8 +224,8 @@ public class Puzzle extends Diagram {
 	
 	// puts a solved/hinted cell into its proper place on a printable
 	// solved puzzle
-	private void setBoardSolved(char[][] board, String rowName) {
-		board[rowName.charAt(1) - '0'][rowName.charAt(3) - '0'] = rowName.charAt(5);
+	private void setBoardSolved(char[][] board, int row, int col, int digit) {
+		board[row][col] = Integer.toString(digit).charAt(0);
 	}
 	
 	// prints a solved puzzle - much more compact than an unsolved puzzle
@@ -232,9 +236,9 @@ public class Puzzle extends Diagram {
 					row[i] = ' ';
 			
 		for (Candidate c : getSudokuHints())
-			setBoardSolved(board, c.getName());
+			setBoardSolved(board, c.getRow(), c.getColumn(), c.getDigit());
 		for (Candidate c : getSudokuSolution())
-			setBoardSolved(board, c.getName());
+			setBoardSolved(board, c.getRow(), c.getColumn(), c.getDigit());
 		
 		StringBuilder sb = new StringBuilder();
 		for (int r = 0; r < 9; r++) {
@@ -246,12 +250,11 @@ public class Puzzle extends Diagram {
 	
 	// puts a solved or hinted cell into its proper place on a
 	// printable unsolved puzzle
-	private void setSingleValue(char[][] board, String candiateName, char tag) {
-		int row = candiateName.charAt(1) - '0';
-		int col = candiateName.charAt(3) - '0';
-		char dig = candiateName.charAt(5);
+	private void setSingleValue(char[][] board,
+			int row, int col, int digit,
+			char tag) {
 		
-		board[row*4 + 1][col*6 + 1] = dig;
+		board[row*4 + 1][col*6 + 1] = Integer.toString(digit).charAt(0);
 		board[row*4][col*6 + 1] = tag;
 		board[row*4 + 2][col*6 + 1] = tag;
 		board[row*4 + 1][col*6] = tag;
@@ -260,15 +263,11 @@ public class Puzzle extends Diagram {
 	
 	// puts a single unsolved candidate into its proper place
 	// on a printable unsolved puzzle
-	private void setCandidate(char[][] board, String candiateName) {
-		int row = candiateName.charAt(1) - '0';
-		int col = candiateName.charAt(3) - '0';
-		char dig = candiateName.charAt(5);
-		int d = dig - '1';
+	private void setCandidate(char[][] board,
+			int row, int col, int digit) {
+		int rowOffs =  (digit - 1) / 3;
+		int colOffs = (digit - 1) % 3;
 		
-		int rowOffs =  d / 3;
-		int colOffs = d % 3;
-		
-		board[row*4 + rowOffs][col*6 + colOffs] = dig;
+		board[row*4 + rowOffs][col*6 + colOffs] = Integer.toString(digit).charAt(0);
 	}
 }

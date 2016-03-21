@@ -1,16 +1,18 @@
 package jc.sudoku.solver.logical;
 
-// This interface represents a deduction found by the logical solver.
-public interface Result {
-	// Returns the name of the candidate affected by this result
-	String getCandidateName();
+import java.util.List;
+
+import jc.sudoku.puzzle.action.Action;
+import jc.sudoku.view.markup.Markup;
+
+public class Result {
+	public Result(List<String> hints, List<Markup> markups, List<Action> actions) {
+		this.hints = hints;
+		this.markups = markups;
+		this.actions = actions;
+	}
 	
-	// Returns a description of this result for logging
-	String getDescription();			
-	
-	// Applies this result to the puzzle, returns the number of nodes updated
-	int apply();
-	
-	// Un-applies this result from the puzzle
-	void undo();
+	public List<String> hints;
+	public List<Markup> markups;
+	public List<Action> actions;
 }

@@ -2,11 +2,14 @@ package jc.sudoku.solver.logical;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jc.sudoku.puzzle.Candidate;
 import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.action.Action;
 import jc.sudoku.solver.Solver;
 import jc.sudoku.solver.logical.strategies.XYWingStrategy;
 import jc.sudoku.solver.logical.strategies.XYWingStrategyStreamed;
@@ -75,19 +78,19 @@ public class LogicalSolver implements Solver {
 	};
 
 	// tries the strategies in order until one of the returns non-empty results
-	public List<Result> findStrategy() {
-		List<Result> results;
+	public Optional<Result> findStrategy() {
+		Optional<Result> result;
 		for (Strategy[] s : strategies) {
 			if (useStreamed && s[1] != null)
-				results = s[1].findResults(puzzle);
+				result = s[1].findResult(puzzle);
 			else
-				results = s[0].findResults(puzzle);
+				result = s[0].findResult(puzzle);
 			
-			if (results != null && results.size() > 0)
-				return results;
+			if (result.isPresent())
+				return result;
 		}
 
-		return null;
+		return Optional.empty();
 	}
 
 	private void recordSolution() {
@@ -105,7 +108,7 @@ public class LogicalSolver implements Solver {
 		if (puzzle.getConstraintCount() == 0)
 			throw new UnsupportedOperationException("No constraints were defined");
 
-		List<Result> resultsThisLevel = new ArrayList<>();
+		List<Action> resultsThisLevel = new ArrayList<>();
 
 		// try logical strategies first
 		while(true) {
@@ -122,14 +125,14 @@ public class LogicalSolver implements Solver {
 				break;
 			}
 
-			List<Result> actions = findStrategy();
-			if (actions == null || actions.size() == 0) {
+			Optional<Result> result = findStrategy();
+			if (!result.isPresent()) {
 				LOG.warn("No logical strategies applicable at this position");
 				break;
 			}
 		
 			// apply the actions that were found by the logical solver
-			for (Result action : actions) {
+			for (Action action : result.get().actions) {
 				LOG.info("Applying logical action: {}", action.getDescription());
 				LOG.info("  {}", action.toString());
 				int k = action.apply();

@@ -151,7 +151,8 @@ public class StreamUtil {
 		}
 	}
 	
-	// Puts the hits in the specified constraints into the rows of a 2D array
+	// Puts the hits in the specified constraints into the rows of a 2D array.
+	// The array will not be 'ragged', short rows will be padded with nulls.
 	public static Hit[][] buildHitsArray(Constraint... constraints) {
 		int maxLength = 0;
 		for (Constraint c : constraints)
@@ -169,20 +170,26 @@ public class StreamUtil {
 		return hits;
 	}
 	
+	// Collect the candidate hits against this constraint into a list
+	public static List<Hit> collectConstraintHits(Constraint constraint) {
+		List<Hit> hits = new ArrayList<>(constraint.getLength());
+		
+		for (Hit hit = constraint.getHead().getDown();
+				hit != constraint.getHead();
+				hit = hit.getDown()) {
+			hits.add(hit);
+		}
+		
+		return hits;
+	}
+
 	// For each constraint in the list, collects its candidate hits into
 	// a sublist and returns a list of all the sublists
 	public static List<List<Hit>> collectConstraintHits(List<Constraint> constraints) {
 		List<List<Hit>> lists = new ArrayList<>(constraints.size());
 		
 		for (Constraint c : constraints) {
-			List<Hit> hits = new ArrayList<>(c.getLength());
-			lists.add(hits);
-			
-			for (Hit hit = c.getHead().getDown();
-					hit != c.getHead();
-					hit = hit.getDown()) {
-				hits.add(hit);
-			}
+			lists.add(collectConstraintHits(c));
 		}
 		
 		return lists;

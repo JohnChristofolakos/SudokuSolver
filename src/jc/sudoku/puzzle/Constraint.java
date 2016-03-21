@@ -12,42 +12,50 @@ public class Constraint extends Column {
 	// constraint number, increasing as 'next' links are followed
 	private int num;					
 	
-	public Constraint(Hit hit, String name, int num, Type type) {
+	// the type of unit this constraint represents
+	private UnitType unitType;
+
+	// the name of the unit this constraint is about
+	private String unitName;
+	
+	public Constraint(Hit hit, String name, int num, UnitType unitType, String unitName) {
 		super(hit, name);
 		this.num = num;
-		this.type = type;
+		this.unitType = unitType;
+		this.unitName = unitName;
 	}
 	
-	public enum Type {
-		UNKNOWN("unknown"),
-		CELL("cell"),
-		ROW("row"),
-		COLUMN("column"),
-		BOX("box");
+	public enum UnitType {
+		UNKNOWN("unknown", "unknowns"),
+		CELL("cell", "cells"),
+		ROW("row", "rows"),
+		COLUMN("column", "columns"),
+		BOX("box", "boxes");
 		
 		private String name;
+		private String namePlural;
 		
-		private Type(String name) {
+		private UnitType(String name, String namePlural) {
 			this.name = name;
+			this.namePlural = namePlural;
 		}
 		
-		@Override
-		public String toString() {
+		public String getName() {
 			return name;
 		}
+		public String getNamePlural() {
+			return namePlural;
+		}
 	};
-	private Type type;
 	
 	public int getNumber()					{ return this.num; }
-	public Type getType()					{ return this.type; }
+	public UnitType getType()				{ return this.unitType; }
+	public String getUnitName()				{ return this.unitName; }
 	
 	// override superclass getters for avoid having to do a lot of casting
-	@Override
-	public Hit getHead()					{ return (Hit)super.getHead(); }
-	@Override
-	public Constraint getPrev()				{ return (Constraint)super.getPrev(); }
-	@Override
-	public Constraint getNext()				{ return (Constraint)super.getNext(); }
+	@Override public Hit getHead()			{ return (Hit)super.getHead(); }
+	@Override public Constraint getPrev()	{ return (Constraint)super.getPrev(); }
+	@Override public Constraint getNext()	{ return (Constraint)super.getNext(); }
 		
 	// Returns true if the hits against this constraint are a (possibly equal) subset of
 	// the hits against the passed-in column

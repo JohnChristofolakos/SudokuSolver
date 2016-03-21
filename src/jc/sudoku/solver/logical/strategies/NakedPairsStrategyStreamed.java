@@ -1,5 +1,10 @@
 package jc.sudoku.solver.logical.strategies;
 
+import static jc.sudoku.view.SudokuViewConsts.*;
+import static jc.sudoku.puzzle.Constraint.UnitType.*;
+import static jc.sudoku.solver.logical.hinting.HintRefType.*;
+import static jc.sudoku.solver.logical.streams.StreamUtil.permute;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -8,15 +13,15 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jc.sudoku.solver.logical.Result;
 import jc.sudoku.solver.logical.Strategy;
-import jc.sudoku.solver.logical.results.CandidateRemovedResult;
+import jc.sudoku.solver.logical.hinting.HintBuilder;
 import jc.sudoku.solver.logical.streams.StreamUtil;
 import jc.sudoku.puzzle.Candidate;
 import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.action.Action;
+import jc.sudoku.puzzle.action.impl.CandidateRemovedAction;
 import jc.sudoku.puzzle.Hit;
-import jc.sudoku.solver.logical.Result;
-
-import static jc.sudoku.solver.logical.streams.StreamUtil.permute;
 
 // This strategy finds:
 // - naked pairs - two cells in a unit that each have exactly the same two
@@ -46,10 +51,10 @@ public class NakedPairsStrategyStreamed implements Strategy {
 	private static Logger LOG = LoggerFactory.getLogger(NakedPairsStrategyStreamed.class);
 	
 	@Override
-	public List<Result> findResults(Puzzle puzzle) {
+	public Optional<Result> findResult(Puzzle puzzle) {
 		LOG.info("Trying NakedPairsStrategyStreamed");
 
-		Optional<List<Result>> results =
+		Optional<Result> optResult =
 				// get all pairs of constraints having 2 candidates each
 				StreamUtil.choose(puzzle.getActiveConstraints(2), 2)
 				
@@ -79,17 +84,11 @@ public class NakedPairsStrategyStreamed implements Strategy {
 				// bingo!
 				.findAny();
 		
-		if (results.isPresent()) {
-			return results.get();
-		} else {
-			return new ArrayList<Result>(0);
-		}
+		return optResult;
 	}
 	
-	private Optional<List<Result>> checkNakedPair(Puzzle puzzle,
+	private Optional<Result> checkNakedPair(Puzzle puzzle,
 			List<List<Hit>> hits) {
-		List<Result> results = new ArrayList<>();
-		
 		LOG.trace("Checking naked pair ({}, {}) in {} and ({}, {}) in {}",
 				hits.get(0).get(0).getCandidate().getName(),
 				hits.get(0).get(1).getCandidate().getName(),
@@ -98,23 +97,17 @@ public class NakedPairsStrategyStreamed implements Strategy {
 				hits.get(1).get(1).getCandidate().getName(),
 				hits.get(1).get(0).getConstraint().getName());
 				
-		checkConflicts(puzzle,
+		return checkConflicts(puzzle,
 				hits.get(0).get(0),
 				hits.get(0).get(1),
 				hits.get(1).get(0),
-				hits.get(1).get(1),
-				results				
+				hits.get(1).get(1)
 				);
-		
-		if (results.isEmpty())
-			return Optional.empty();
-		else
-			return Optional.of(results);
 	}
 	
-	private void checkConflicts(Puzzle puzzle,
-			Hit h1, Hit h2, Hit h3, Hit h4,
-			List<Result> results) {
+	private Optional<Result> checkConflicts(Puzzle puzzle,
+			Hit h1, Hit h2, Hit h3, Hit h4) {
+		
 		if (h1.getCandidate().hits(h3.getCandidate()) &&
 			h2.getCandidate().hits(h4.getCandidate())) {
 			// So if n1 is in, then n4 must be in, if n1 is out, then n3 must
@@ -123,40 +116,127 @@ public class NakedPairsStrategyStreamed implements Strategy {
 			//
 			// We can eliminate all candidates that conflict with both members
 			// of either pair.
-			for (Candidate c = puzzle.getRootCandidate().getNext();
-					c!= puzzle.getRootCandidate();
-					c = c.getNext()) {
-				if (c != h1.getCandidate() && c != h3.getCandidate()) {
-					if (c.hits(h1.getCandidate()) &&
-						c.hits(h3.getCandidate())) {
-						LOG.info("Found candidate {} conflicts with naked pair: {} vs {} and {} vs {} ({}/{})",
-								c.getName(),
-								h1.getCandidate().getName(), h3.getCandidate().getName(),
-								h2.getCandidate().getName(), h4.getCandidate().getName(),
-								h1.getConstraint().getName(), h3.getConstraint().getName());
-						results.add(new CandidateRemovedResult(puzzle, c,
-								String.format("conflicts with naked pair (%s, %s) and (%s, %s) (%s/%s)",
-										h1.getCandidate().getName(), h3.getCandidate().getName(), h2.getCandidate().getName(), h4.getCandidate().getName(),
-										h1.getConstraint().getName(), h3.getConstraint().getName())));
-					}
-				}
+			HintBuilder hintBuilder = new HintBuilder();
+			List<Action> actions = new ArrayList<>();
 
-				if (c != h2.getCandidate() && c != h4.getCandidate()) {
-					if (c.hits(h2.getCandidate()) &&
-						c.hits(h4.getCandidate())) {
-						LOG.info("Found candidate {} conflicts with naked pair: {} vs {} and {} vs {} ({}/{})",
-								c.getName(),
-								h2.getCandidate().getName(), h4.getCandidate().getName(),
-								h1.getCandidate().getName(), h3.getCandidate().getName(),
-								h1.getConstraint().getName(), h3.getConstraint().getName());
-						results.add(new CandidateRemovedResult(puzzle, c,
-								String.format("conflicts with naked pair (%s, %s) and (%s, %s) (%s/%s)",
-										h2.getCandidate().getName(), h4.getCandidate().getName(),
+			List<Hit> cellsToHint;			// sometimes there are two, sometimes 4
+			
+			// these come in various flavours depending on the type of constraints involved
+			if (h1.getConstraint().getType() == CELL &&
+				h3.getConstraint().getType() == CELL) {
+				// this is a naked pair
+				hintBuilder.addText("There is a Naked Pair ...")
+					.newHint();
+				cellsToHint = Arrays.asList(h1, h3);
+			} else if (h1.getConstraint().getUnitName().equals(h3.getConstraint().getUnitName())) {
+				// this is a hidden pair
+				hintBuilder.addText("There is a Hidden Pair ...")
+					.newHint();
+				cellsToHint = Arrays.asList(h1, h3);
+			} else {
+				// this is an X-Wing
+				hintBuilder.addText("There is an X-Wing ...")
+					.newHint();
+				cellsToHint = Arrays.asList(h1, h2, h3, h4);
+			}
+			
+			// build the second hint
+			hintBuilder.addText("Check the cells ")
+				.addHintRefs(CELL_NAME, cellsToHint, HIGHLIGHT_GREEN)
+				.addText(" ...")
+				.newHint();
+			
+			// find candidates that conflict with h1 and h3
+			findConflicts(puzzle, h1, h3, h2, h4, hintBuilder, actions);
+			
+			// find candidates that conflict with h2 and h4
+			findConflicts(puzzle, h2, h4, h1, h3, hintBuilder, actions);
+			
+			// did we find any eliminations?
+			if (actions.size() > 0) {
+				return Optional.of(new Result(hintBuilder.getHints(), hintBuilder.getMarkups(), actions));
+			}
+		}
+		return Optional.empty();
+	}
+
+	private void findConflicts(Puzzle puzzle, Hit h1, Hit h3, Hit h2, Hit h4,
+			HintBuilder hintBuilder, List<Action> actions) {
+		// format an introductory sentence
+		hintBuilder.addText("Either ")
+				.addHintRef(CANDIDATE_NAME, h1, HIGHLIGHT_GREEN)
+				.addText(" or ")
+				.addHintRef(CANDIDATE_NAME, h3, HIGHLIGHT_GREEN)
+				.addText(" must be in the solution, so the following candidates can be removed:\n");
+
+		boolean foundOne = false;
+		for (Candidate c = puzzle.getRootCandidate().getNext();
+				c != puzzle.getRootCandidate();
+				c = c.getNext()) {
+			
+			if (c != h1.getCandidate() && c != h3.getCandidate()) {
+				if (c.hits(h1.getCandidate()) && c.hits(h3.getCandidate())) {
+					LOG.info("Found candidate {} conflicts with naked pair: {} vs {} and {} vs {}",
+							c.getName(),
+							h1.getCandidate().getName(), h3.getCandidate().getName(),
+							h2.getCandidate().getName(), h4.getCandidate().getName());
+					foundOne = true;
+
+					// see if there's a constraint shared by c and both h1 and h2 candidates
+					Hit conflict = c.findCommonConstraint(h1.getCandidate(), h3.getCandidate());
+					
+					// for a standard sudoku, there will be a comon constraint, but
+					// not necessarily for Sudoku variants
+					if (conflict == null) {
+						// should both return non-null, since we tested they hit each other already
+						Hit conflict1 = c.findCommonConstraint(h1.getCandidate());
+						Hit conflict2 = c.findCommonConstraint(h3.getCandidate());
+					
+						hintBuilder.addText("- candidate ")
+								.addHintRef(CANDIDATE_NAME, conflict1, HIGHLIGHT_YELLOW)
+								.addText(" conflicts with ")
+								.addHintRef(CANDIDATE_NAME, h1, HIGHLIGHT_GREEN)
+								.addText(" in ")
+								.addHintRef(UNIT_TYPE_AND_NAME, conflict1, HIGHLIGHT_YELLOW)
+								.addText(" and also with ")
+								.addHintRef(CANDIDATE_NAME, h3, HIGHLIGHT_GREEN)
+								.addText(" in ")
+								.addHintRef(UNIT_TYPE_AND_NAME, conflict2, HIGHLIGHT_YELLOW)
+								.addText("\n");
+						
+						actions.add(new CandidateRemovedAction(puzzle, conflict1,
+								String.format("conflicts with naked pair (%s, %s) and (%s, %s) in %s %s and %s %s",
 										h1.getCandidate().getName(), h3.getCandidate().getName(),
-										h1.getConstraint().getName(), h3.getConstraint().getName())));
+										h2.getCandidate().getName(), h4.getCandidate().getName(),
+										conflict1.getConstraint().getType().getName(),
+										conflict1.getConstraint().getUnitName(),
+										conflict2.getConstraint().getType().getName(),
+										conflict2.getConstraint().getUnitName()
+								)));
+					} else {
+						hintBuilder.addText("- candidate ")
+								.addHintRef(CANDIDATE_NAME, conflict, HIGHLIGHT_YELLOW)
+								.addText(" conflicts with ")
+								.addHintRef(CANDIDATE_NAME, h1, HIGHLIGHT_GREEN)
+								.addText(" and ")
+								.addHintRef(CANDIDATE_NAME, h3, HIGHLIGHT_GREEN)
+								.addText(" in ")
+								.addHintRef(UNIT_TYPE_AND_NAME, conflict, HIGHLIGHT_YELLOW)
+								.addText("\n");
+
+						actions.add(new CandidateRemovedAction(puzzle, conflict,
+								String.format("conflicts with naked pair (%s, %s) and (%s, %s) in %s %s",
+										h1.getCandidate().getName(), h3.getCandidate().getName(),
+										h2.getCandidate().getName(), h4.getCandidate().getName(),
+										conflict.getConstraint().getType().getName(),
+										conflict.getConstraint().getUnitName()
+								)));
 					}
 				}
 			}
 		}
+		
+		if (!foundOne)
+			hintBuilder.clearHint();		// didn't need this one after all
 	}
 }

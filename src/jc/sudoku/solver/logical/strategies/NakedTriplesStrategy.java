@@ -1,19 +1,27 @@
 package jc.sudoku.solver.logical.strategies;
 
+import static jc.sudoku.view.SudokuViewConsts.*;
+import static jc.sudoku.puzzle.Constraint.UnitType.*;
+import static jc.sudoku.solver.logical.hinting.HintRefType.*;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jc.sudoku.solver.logical.Result;
 import jc.sudoku.solver.logical.Strategy;
-import jc.sudoku.solver.logical.results.CandidateRemovedResult;
+import jc.sudoku.solver.logical.hinting.HintBuilder;
 import jc.sudoku.solver.logical.streams.StreamUtil;
 import jc.sudoku.puzzle.Candidate;
 import jc.sudoku.puzzle.Constraint;
 import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.action.Action;
+import jc.sudoku.puzzle.action.impl.CandidateRemovedAction;
 import jc.sudoku.puzzle.Hit;
-import jc.sudoku.solver.logical.Result;
 
 // This strategy finds:
 // - naked triples - 3 cells in the same unit that have the same three candidates
@@ -40,8 +48,7 @@ public class NakedTriplesStrategy implements Strategy {
 	private static Logger LOG = LoggerFactory.getLogger(NakedTriplesStrategy.class);
 
 	@Override
-	public List<Result> findResults(Puzzle puzzle) {
-		List<Result> results = new ArrayList<Result>();
+	public Optional<Result> findResult(Puzzle puzzle) {
 		LOG.info("Trying NakedTriplesStrategy");
 		
 		for (Constraint c1 = puzzle.getRootConstraint().getNext();
@@ -77,14 +84,13 @@ public class NakedTriplesStrategy implements Strategy {
 						}
 					}
 					
-					checkConflicts(puzzle, hits, 0, results);
-					
-					if (results.size() > 0)
-						return results;
+					Optional<Result> result = checkConflicts(puzzle, hits, 0);
+					if (result.isPresent())
+						return result;
 				}
 			}
 		}
-		return results;
+		return Optional.empty();
 	}
 	
 	private void swap(Hit[] nodes, int i, int j) {
@@ -94,7 +100,7 @@ public class NakedTriplesStrategy implements Strategy {
 	}
 	
 	// determine if the intersection of the candidates containing n1, n2, n3 is non-empty,
-	// being careful since on of them could be null
+	// being careful since one of them could be null
 	private boolean intersects(Hit n1, Hit n2, Hit n3) {
 		if (n1 == null)
 			return (n2== null || n3 == null) ? false
@@ -110,93 +116,225 @@ public class NakedTriplesStrategy implements Strategy {
 	}
 	
 	// recursively checks the hits in hits[][] for the naked triple pattern
-	private void checkConflicts(Puzzle puzzle, Hit[][] nodes,
-			int n, List<Result> actions) {
+	private Optional<Result> checkConflicts(Puzzle puzzle, Hit[][] hits, int n) {
 		if (n == 2) {		// no need to permute the last constraint row
 			// if the hits at each position in the three constraint rows
 			// conflict with each other, then this is a naked triple pattern
 			for (int i = 0; i < 3; i++) {
-				if (!intersects(nodes[0][i], nodes[1][i], nodes[2][i]))
-					return;
+				if (!intersects(hits[0][i], hits[1][i], hits[2][i]))
+					return Optional.empty();
 			}
 			
-			// OK these hits have the right pattern, so any candidates that
-			// conflict with the 2 or 3 nodes at each position can be removed
-			boolean foundOne = false;
-			for (int i = 0; i < 3; i++) {
-				foundOne |= check(puzzle, nodes[0][i], nodes[1][i], nodes[2][i], actions);
-			}
-			if (foundOne && LOG.isInfoEnabled()) {
-				StringBuilder sb = new StringBuilder();
-				sb.append("[");
-				for (int i = 0; i < 3; i++) {
-					sb.append("(");
-					for (int j = 0; j < 3; j++) {
-						sb.append(nodes[i][j] == null ? "null"
-								: nodes[i][j].getCandidate().getName());
-						if (j < 2)
-							sb.append(", ");
-					}
-					sb.append(")");
-					if (i < 2)
-						sb.append(", ");
-				}
-				sb.append("]");
-				LOG.info("Found conflicts with naked triple {}", sb.toString());
-			}
+			// we found the right hit permuations to form the naked triple
+			// check for conflicting candidates and resturn the result, if any
+			return checkTriple(puzzle, hits);
 		}
 		else {
 			// swap around the hits in row n, and recurse into row n+1
 			for (int i = 0; i < 3; i++) {
 				// try each node in the first position
-				swap(nodes[n], 0, i);
-				checkConflicts(puzzle, nodes, n+1, actions);
+				if (i != 0) swap(hits[n], 0, i);
+				Optional<Result> result = checkConflicts(puzzle, hits, n+1);
+				if (result.isPresent()) return result;
 				
 				// swap the other two and try again
-				swap(nodes[n], 1, 2);
-				checkConflicts(puzzle, nodes, n+1, actions);
+				swap(hits[n], 1, 2);
+				result = checkConflicts(puzzle, hits, n+1);
+				if (result.isPresent()) return result;
 				
 				// put them back
-				swap(nodes[n], 1, 2);
-				swap(nodes[n], 0, i);
+				swap(hits[n], 1, 2);
+				if (i != 0) swap(hits[n], 0, i);
 			}
+			return Optional.empty();
+		}
+	}
+	
+	private Optional<Result> checkTriple(Puzzle puzzle, Hit[][] hits) {
+		// OK these hits have the right pattern, so any candidates that
+		// conflict with the 2 or 3 nodes at each position can be removed
+		HintBuilder hintBuilder = new HintBuilder();
+		List<Action> actions = new ArrayList<>();
+		
+		// these come in various flavours depending on the constraints involved
+		// find the first non-null hit in each constraint
+		Hit[] constraintHits = new Hit[3];
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				if (hits[i][j] != null) {
+					constraintHits[i] = hits[i][j];
+					break;
+				}
+			}
+		}
+		
+		List<Hit> cellsToHint;
+		if (constraintHits[0].getConstraint().getType() == CELL &&
+			constraintHits[1].getConstraint().getType() == CELL &&
+			constraintHits[2].getConstraint().getType() == CELL) {
+			// this is a naked triple
+			hintBuilder.addText("There is a Naked Triple ...").newHint();
+			cellsToHint = Arrays.asList(constraintHits[0], constraintHits[1], constraintHits[2]);
+		}
+		else if (constraintHits[0].getConstraint().getUnitName().equals(
+							constraintHits[1].getConstraint().getUnitName()) &&
+				   constraintHits[0].getConstraint().getUnitName().equals(
+						   constraintHits[2].getConstraint().getUnitName())) {
+			// this is a hidden triple
+			hintBuilder.addText("There is a Hidden Triple ...").newHint();
+			cellsToHint = Arrays.asList(constraintHits[0], constraintHits[1], constraintHits[2]);
+		}
+		else {
+			// this is a swordfish
+			hintBuilder.addText("There is a Swordfish ...").newHint();
+			cellsToHint = new ArrayList<>();
+			for (int i = 0; i < 3; i++)
+				for (int j = 0; j < 3; j++)
+					if (hits[i][j] != null)
+						cellsToHint.add(hits[i][j]);
+		}
+		
+		// build the second hint
+		hintBuilder.addText("Check the cells ")
+			.addHintRefs(CELL_NAME, cellsToHint, HIGHLIGHT_GREEN)
+			.addText(" ...")
+			.newHint();
+		
+		// find candidates that conflict with all the nodes at any of the positions
+		// in the three arrays of constraint hits
+		for (int i = 0; i < 3; i++) {
+			checkConflicts(puzzle, hits[0][i], hits[1][i], hits[2][i], hintBuilder, actions);
+		}
+		
+		// if we found candidates to be removed, return a result, otherwise return an
+		// empty Optional
+		if (actions.size() > 0) {
+			Result result = new Result(hintBuilder.getHints(), hintBuilder.getMarkups(), actions);
+			return Optional.of(result);
+		} else {
+			return Optional.empty();
 		}
 	}
 
-	// we've determined that one of the 3 candidates containing n1, n2 and n3 must
-	// be in the solution, any other candidates that conflict with all of these can be removed
-	private boolean check(Puzzle puzzle,
-			Hit n1, Hit n2, Hit n3, List<Result> actions) {
+	// We've determined that one of the h1, h2, h3 candidates must be in
+	// the solution, any other candidates that conflict with all of these
+	// can be removed. One of h1, h2, h3 may be null, if so just ignore it.
+	private void checkConflicts(Puzzle puzzle,
+			Hit h1, Hit h2, Hit h3,
+			HintBuilder hintBuilder, List<Action> actions) {
 		boolean foundOne = false;
+		
+		// the order of h1, h2, h3 doesn't matter at this point, so if
+		// there is a null, let's make it h3 to simplify the logic below
+		if (h1 == null) { h1 = h3; h3 = null; }
+		if (h2 == null) { h2 = h3; h3 = null; }
+		
+		// format an introductory sentence
+		hintBuilder.addText("Either ")
+				.addHintRef(CANDIDATE_NAME, h1, HIGHLIGHT_GREEN)
+				.addText(" or ")
+				.addHintRef(CANDIDATE_NAME, h2, HIGHLIGHT_GREEN);
+		if (h3 != null)
+			hintBuilder.addText(" or ")
+					.addHintRef(CANDIDATE_NAME, h3, HIGHLIGHT_GREEN);
+		hintBuilder.addText(" must be in the solution, " +
+					"so the following candidates can be removed:\n");
 		
 		for (Candidate c = puzzle.getRootCandidate().getNext();
 				c != puzzle.getRootCandidate();
 				c = c.getNext()) {
-			if (n1 != null && c == n1.getCandidate()) continue;
-			if (n2 != null && c == n2.getCandidate()) continue;
-			if (n3 != null && c == n3.getCandidate()) continue;
+			// skip over the h1, h2, h3 candidates 
+			if (c == h1.getCandidate()) continue;
+			if (c == h2.getCandidate()) continue;
+			if (h3 != null && c == h3.getCandidate()) continue;
 			
-			if (n1 != null && !c.hits(n1.getCandidate())) continue;
-			if (n2 != null && !c.hits(n2.getCandidate())) continue;
-			if (n3 != null && !c.hits(n3.getCandidate())) continue;
+			// does this candidate conflict with all of the non-null
+			// h1, h2, h3 candidates?
+			if (!c.hits(h1.getCandidate())) continue;
+			if (!c.hits(h2.getCandidate())) continue;
+			if (h3 != null && !c.hits(h3.getCandidate())) continue;
 			
+			// bingo!
 			String name = String.format("conflicts with naked triple %s, %s, and %s",
-					n1 == null ? "---" : n1.getCandidate().getName(),
-					n2 == null ? "---" : n2.getCandidate().getName(),
-					n3 == null ? "---" : n3.getCandidate().getName());
-			addAction(actions, 
-					new CandidateRemovedResult(puzzle, c, name));
+					h1.getCandidate().getName(),
+					h2.getCandidate().getName(),
+					h3 == null ? "---" : h3.getCandidate().getName());
+			if (addAction(actions, 
+					new CandidateRemovedAction(puzzle, c.getFirstHit(), name))) {
+				LOG.info("Candidate {} {}", c.getDisplayName(), name);
+				
+				addToHint(hintBuilder, c, h1, h2, h3);
+			}
 			foundOne = true;
 		}
-		return foundOne;
+		
+		// if we didn't find any candidates to remove, then discard the hint we started
+		// building, otherwise add a blank line before the next one
+		if (!foundOne)
+			hintBuilder.clearHint();
+		else
+			hintBuilder.addText("\n");
 	}
 	
-	private void addAction(List<Result> actions, Result action) {
+	// Returns true if this was not a duplicate of an existing action
+	private boolean addAction(List<Action> actions, Action action) {
 		// avoid duplicate candidate removals
-		for (Result act : actions)
-			if (act.getDescription().equals(action.getCandidateName()))
-				return;
+		for (Action act : actions)
+			if (act.getCandidate().equals(action.getCandidate()))
+				return false;
 		
 		actions.add(action);
+		return true;
+	}
+	
+	// Formats a hint bullet to explain why this candidate can be removed
+	private void addToHint(HintBuilder hintBuilder, Candidate c,
+			Hit h1, Hit h2, Hit h3) {
+		// see if there's a constraint shared by c and all the h1, h2 h3 candidates
+		Hit conflict;
+		if (h3 == null)
+			 conflict = c.findCommonConstraint(h1.getCandidate(), h2.getCandidate());
+		else
+			conflict = c.findCommonConstraint(h1.getCandidate(), h2.getCandidate(), h3.getCandidate());
+		
+		// for a standard sudoku, there will be a comon constraint, but
+		// not necessarily for Sudoku variants
+		if (conflict == null) {
+			// should both return non-null, since we tested they hit each other already
+			Hit conflict1 = c.findCommonConstraint(h1.getCandidate());
+			Hit conflict2 = c.findCommonConstraint(h2.getCandidate());
+			Hit conflict3 = h3 == null ? null : c.findCommonConstraint(h3.getCandidate());
+			
+			hintBuilder.addText("- candidate ")
+					.addHintRef(CANDIDATE_NAME, c.getFirstHit(), HIGHLIGHT_YELLOW)
+					.addText(" conflicts with ")
+					.addHintRef(CANDIDATE_NAME, h1, HIGHLIGHT_GREEN)
+					.addText(" in ")
+					.addHintRef(UNIT_TYPE_AND_NAME, conflict1, HIGHLIGHT_YELLOW)
+					.addText(h3 == null ? " and also with " : ", with ")
+					.addHintRef(CANDIDATE_NAME, h2, HIGHLIGHT_GREEN)
+					.addText(" in ")
+					.addHintRef(UNIT_TYPE_AND_NAME, conflict2, HIGHLIGHT_YELLOW);
+			if (h3 != null)
+				hintBuilder.addText(" and also with ")
+						.addHintRef(CANDIDATE_NAME, h3, HIGHLIGHT_GREEN)
+						.addText(" in ")
+						.addHintRef(UNIT_TYPE_AND_NAME, conflict3, HIGHLIGHT_YELLOW);
+			hintBuilder.addText("\n");
+		} else {
+			hintBuilder.addText("- candidate ")
+					.addHintRef(CANDIDATE_NAME, c.getFirstHit(), HIGHLIGHT_YELLOW)
+					.addText(" conflicts with ")
+					.addHintRef(CANDIDATE_NAME, h1, HIGHLIGHT_GREEN)
+					.addText(h3 == null ? " and " : ", ")
+					.addHintRef(CANDIDATE_NAME, h2, HIGHLIGHT_GREEN);
+			if (h3 != null)
+				hintBuilder.addText(" and ")
+						.addHintRef(CANDIDATE_NAME, h3, HIGHLIGHT_GREEN);
+			hintBuilder
+					.addText(" in ")
+					.addHintRef(UNIT_TYPE_AND_NAME, conflict, HIGHLIGHT_YELLOW)
+					.addText("\n");
+		}
 	}
 }

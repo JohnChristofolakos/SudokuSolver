@@ -1,10 +1,10 @@
 package jc.sudoku.solver.logical.strategies;
 
-import java.util.List;
+import java.util.Optional;
 
-import jc.sudoku.solver.logical.Strategy;
 import jc.sudoku.puzzle.Puzzle;
 import jc.sudoku.solver.logical.Result;
+import jc.sudoku.solver.logical.Strategy;
 
 // This strategy looks for unique rectangles. It is a special case of the hidden
 // unique rectangle strategy, where the constraints are restricted to being 'cell'
@@ -23,7 +23,7 @@ public class UniqueRectStrategy implements Strategy {
 	private Strategy strategy;
 	
 	@Override
-	public List<Result> findResults(Puzzle puzzle) {
-		return strategy.findResults(puzzle);
+	public Optional<Result> findResult(Puzzle puzzle) {
+		return strategy.findResult(puzzle);
 	}
 }

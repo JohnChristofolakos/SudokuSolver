@@ -22,6 +22,12 @@ public class Candidate extends Row {
 	private int digit;
 	public int getDigit() 				{ return digit; }
 	
+	// display name
+	public String getDisplayName() {
+		return String.format("%d@%s%s",
+				getDigit(), Puzzle.rowNames[row], Puzzle.colNames[col]);
+	}
+	
 	// the Sudoku row and column number this candidate represents
 	private int row, col;
 	public int getRow() 				{ return row; }
@@ -40,29 +46,29 @@ public class Candidate extends Row {
 	// returns the list of hits indicating the constraints where this
 	// candidate conflicts with the passed-in candidate
 	public Candidate sharedHits(Candidate c) {
-		Candidate hits = new Candidate("", 0, 0, 0, 0);
+		Candidate hits = new Candidate("", 0, digit, row, col);
 		
 		if (this.getFirstHit() == null || c.getFirstHit() == null)
 			return hits;
 		
-		Hit n1 = this.getFirstHit();
-		Hit n2 = c.getFirstHit();
+		Hit h1 = this.getFirstHit();
+		Hit h2 = c.getFirstHit();
 
 		// a little awkward since rows don't have header nodes
 outer:	do {
-			while (n2.getConstraint().getNumber() <
-					n1.getConstraint().getNumber()) {
-				n2 = n2.getRight();
-				if (n2 == c.getFirstHit())
+			while (h2.getConstraint().getNumber() <
+					h1.getConstraint().getNumber()) {
+				h2 = h2.getRight();
+				if (h2 == c.getFirstHit())
 					break outer;
 			}
-			if (n2.getConstraint().getNumber() ==
-					n1.getConstraint().getNumber())
-				hits.addHit(new Hit(n1));
+			if (h2.getConstraint().getNumber() ==
+					h1.getConstraint().getNumber())
+				hits.addHit(new Hit(h1));
 			
-			n1 = n1.getRight();
+			h1 = h1.getRight();
 		}
-		while (n1 != this.getFirstHit());
+		while (h1 != this.getFirstHit());
 		
 		return hits;
 	}
@@ -73,26 +79,77 @@ outer:	do {
 		if (this.getFirstHit() == null || c.getFirstHit() == null)
 			return false;
 		
-		Hit n1 = this.getFirstHit();
-		Hit n2 = c.getFirstHit();
+		Hit h1 = this.getFirstHit();
+		Hit h2 = c.getFirstHit();
 		
 		// a little awkward since rows don't have header nodes
 outer:	do {
-			while (n2.getConstraint().getNumber() <
-					n1.getConstraint().getNumber()) {
-				n2 = n2.getRight();
-				if (n2 == c.getFirstHit())
+			while (h2.getConstraint().getNumber() <
+					h1.getConstraint().getNumber()) {
+				h2 = h2.getRight();
+				if (h2 == c.getFirstHit())
 					break outer;
 			}
-			if (n2.getConstraint().getNumber() ==
-					n1.getConstraint().getNumber()) {
+			if (h2.getConstraint().getNumber() ==
+					h1.getConstraint().getNumber()) {
 				return true;
 			}
 			
-			n1 = n1.getRight();
+			h1 = h1.getRight();
 		}
-		while (n1 != this.getFirstHit());
+		while (h1 != this.getFirstHit());
 		
 		return false;
+	}
+
+	public Hit findCommonConstraint(Candidate... cList) {
+		if (this.getFirstHit() == null)
+			return null;
+		for (Candidate c : cList)
+			if (c.getFirstHit() == null)
+				return null;
+		
+		Hit h = this.getFirstHit();
+		Hit[] hList = new Hit[cList.length];
+		for (int i = 0; i < cList.length; i++)
+			hList[i] = cList[i].getFirstHit();
+
+		// a little awkward since rows don't have header nodes
+outer:	do {
+			// step all the candidate's current hit forward until their
+			// constraint number is greater than or equal to this candidate's
+			// current hit's constraint number
+			for (int i = 0; i < hList.length; i++) {
+				while (hList[i].getConstraint().getNumber() <
+						h.getConstraint().getNumber()) {
+					hList[i] = hList[i].getRight();
+					if (hList[i] == cList[i].getFirstHit())
+						// if we run out of hits in any candidate, then
+						// we have no common constraint
+						return null;
+				}
+			}
+			
+			// check if we've found a common constraint
+			boolean foundIt = true;
+			for (Hit hh : hList) { 
+				if (hh.getConstraint().getNumber() !=
+					h.getConstraint().getNumber()) {
+					foundIt = false;
+					break;
+				}
+			}
+			
+			// we never reset foundIt, so this is a common constraint
+			if (foundIt)
+				return h;
+			
+			// some candidate does not share h's constraint, so step it forward
+			// and try again
+			h = h.getRight();
+		}
+		while (h != this.getFirstHit());
+		
+		return null;
 	}
 }

@@ -67,7 +67,8 @@ public abstract class PuzzleReader {
 		// create the cell constraints first
 		for (int r = 0; r < 9; r++) {
 			for (int c = 0; c < 9; c++) {
-				puzzle.addConstraint("p" + r + c, Constraint.Type.CELL);
+				puzzle.addConstraint("p" + r + c, Constraint.UnitType.CELL,
+						Puzzle.rowNames[r] + Puzzle.colNames[c]);
 			}
 		}
 		
@@ -76,19 +77,19 @@ public abstract class PuzzleReader {
 		// box constraints. So when we add the candidates below, we can ensure
 		// candidate hits are added to the row in ascending constraint number
 		// order. Routines like candidate#sharedHits depend on this ordering.
-		for (int i = 0; i < 9; i++) {
+		for (int r = 0; r < 9; r++) {
 			for (int d = 1; d <= 9; d++) {
-				puzzle.addConstraint("r" + i + d, Constraint.Type.ROW);
+				puzzle.addConstraint("r" + r + d, Constraint.UnitType.ROW, Puzzle.rowNames[r]);
 			}
 		}
-		for (int i = 0; i < 9; i++) {
+		for (int c = 0; c < 9; c++) {
 			for (int d = 1; d <= 9; d++) {
-				puzzle.addConstraint("c" + i + d, Constraint.Type.COLUMN);
+				puzzle.addConstraint("c" + c + d, Constraint.UnitType.COLUMN, Puzzle.colNames[c]);
 			}
 		}
-		for (int i = 0; i < 9; i++) {
+		for (int b = 0; b < 9; b++) {
 			for (int d = 1; d <= 9; d++) {
-				puzzle.addConstraint("b" + i + d, Constraint.Type.BOX);
+				puzzle.addConstraint("b" + b + d, Constraint.UnitType.BOX, Puzzle.boxNames[b]);
 			}
 		}
 	}

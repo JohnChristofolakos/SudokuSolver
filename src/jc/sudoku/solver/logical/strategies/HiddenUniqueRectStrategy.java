@@ -1,20 +1,27 @@
 package jc.sudoku.solver.logical.strategies;
 
+import static jc.sudoku.view.SudokuViewConsts.*;
+import static jc.sudoku.puzzle.Constraint.UnitType.*;
+import static jc.sudoku.solver.logical.hinting.HintRefType.*;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jc.sudoku.solver.logical.Result;
 import jc.sudoku.solver.logical.Strategy;
-import jc.sudoku.solver.logical.results.CandidateRemovedResult;
+import jc.sudoku.solver.logical.hinting.HintBuilder;
 import jc.sudoku.puzzle.Candidate;
 import jc.sudoku.puzzle.Constraint;
 import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.action.Action;
+import jc.sudoku.puzzle.action.impl.CandidateRemovedAction;
 import jc.sudoku.puzzle.Hit;
-import jc.sudoku.solver.logical.Result;
 
 // This strategy looks for 'unique rectangles'. It can be used only on puzzles
 // where it is known there is a single unique solution. The situation is that if
@@ -55,8 +62,8 @@ public class HiddenUniqueRectStrategy implements Strategy {
 	private boolean limitToCells = false;
 	
 	@Override
-	public List<Result> findResults(Puzzle puzzle) {
-		List<Result> results = new ArrayList<Result>();
+	public Optional<Result> findResult(Puzzle puzzle) {
+		Optional<Result> result = Optional.empty();
 		LOG.info("Trying {}", limitToCells ? "UniqueRectStrategy" : "HiddenUniqueRectStrategy");
 		
 		for (Constraint c1 = puzzle.getRootConstraint().getNext();
@@ -64,7 +71,7 @@ public class HiddenUniqueRectStrategy implements Strategy {
 				c1 = c1.getNext()) {
 			// must be a bi-value constraint, and optionally must be a cell constraint
 			if (c1.getLength() != 2) continue;
-			if (limitToCells && !c1.getType().equals("cell")) continue;
+			if (limitToCells && c1.getType() != CELL) continue;
 
 			for (Constraint c2 = c1.getNext();
 					c2 != puzzle.getRootConstraint();
@@ -72,7 +79,7 @@ public class HiddenUniqueRectStrategy implements Strategy {
 				// must be a bi-value constraint, disjoint from c1, and optionally
 				// must be a cell constraint
 				if (c2.getLength() != 2) continue;
-				if (limitToCells && !c2.getType().equals("cell")) continue;
+				if (limitToCells && c2.getType() != CELL) continue;
 				if (c2.hits(c1)) continue;
 				
 				for (Constraint c3 = c2.getNext();
@@ -81,7 +88,7 @@ public class HiddenUniqueRectStrategy implements Strategy {
 					// must be a bi-value constraint, disjoint from c1 and c2, and
 					// optionally must be a cell constraint
 					if (c3.getLength() != 2) continue;
-					if (limitToCells && !c3.getType().equals("cell")) continue;
+					if (limitToCells && c3.getType() != CELL) continue;
 					if (c3.hits(c1) || c3.hits(c2)) continue;
 					
 					// scan all constraints looking for a possible fourth corner
@@ -97,171 +104,206 @@ public class HiddenUniqueRectStrategy implements Strategy {
 						// them for disjointness then
 						
 						// try the possible combinations of the first 3 corners
-						Hit n1 = c1.getHead().getDown();
-						Hit n2 = n1.getDown();
-						Hit n3 = c2.getHead().getDown();
-						Hit n4 = n3.getDown();
-						Hit n5 = c3.getHead().getDown();
-						Hit n6 = n5.getDown();
+						Hit h1 = c1.getHead().getDown();
+						Hit h2 = h1.getDown();
+						Hit h3 = c2.getHead().getDown();
+						Hit h4 = h3.getDown();
+						Hit h5 = c3.getHead().getDown();
+						Hit h6 = h5.getDown();
 						
 						// try to build a rectangle satisfying the intersection
 						// constraints given above we need to try col4 diagonally
 						// opposite to each of the other three
-						checkConflicts(puzzle, n1, n2, n3, n4, n5, n6, c4, results);		// 135x and 246x
-						checkConflicts(puzzle, n1, n2, n3, n4, n6, n5, c4, results);		// 136x and 245x
-						checkConflicts(puzzle, n1, n2, n4, n3, n5, n6, c4, results);		// 145x and 236x
-						checkConflicts(puzzle, n1, n2, n4, n3, n6, n5, c4, results);		// 146x and 235x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h1, h2, h3, h4, h5, h6, c4);	// 135x and 246x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h1, h2, h3, h4, h6, h5, c4);	// 136x and 245x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h1, h2, h4, h3, h5, h6, c4);	// 145x and 236x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h1, h2, h4, h3, h6, h5, c4);	// 146x and 235x
 						
-						checkConflicts(puzzle, n3, n4, n1, n2, n5, n6, c4, results);		// 315x and 426x
-						checkConflicts(puzzle, n3, n4, n1, n2, n6, n5, c4, results);		// 316x and 425x
-						checkConflicts(puzzle, n4, n3, n1, n2, n5, n6, c4, results);		// 415x and 326x
-						checkConflicts(puzzle, n4, n3, n1, n2, n6, n5, c4, results);		// 416x and 325x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h3, h4, h1, h2, h5, h6, c4);	// 315x and 426x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h3, h4, h1, h2, h6, h5, c4);	// 316x and 425x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h4, h3, h1, h2, h5, h6, c4);	// 415x and 326x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h4, h3, h1, h2, h6, h5, c4);	// 416x and 325x
 
-						checkConflicts(puzzle, n1, n2, n5, n6, n3, n4, c4, results);		// 153x and 264x
-						checkConflicts(puzzle, n1, n2, n6, n5, n3, n4, c4, results);		// 163x and 254x
-						checkConflicts(puzzle, n1, n2, n5, n6, n4, n3, c4, results);		// 154x and 263x
-						checkConflicts(puzzle, n1, n2, n6, n5, n4, n3, c4, results);		// 164x and 253x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h1, h2, h5, h6, h3, h4, c4);	// 153x and 264x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h1, h2, h6, h5, h3, h4, c4);	// 163x and 254x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h1, h2, h5, h6, h4, h3, c4);	// 154x and 263x
+						if (!result.isPresent())
+							checkConflicts(puzzle, h1, h2, h6, h5, h4, h3, c4);	// 164x and 253x
 
 						// these are susceptible to being 'found' twice if we
 						// continue, so get out after the first one is found
-						if (results.size() > 0)
-							return results;
+						if (result.isPresent())
+							return result;
 					}
 				}
 			}
 		}
-		return results;
+		return Optional.empty();
 	}
 	
 	// check if we can make a proper rectangle out of the 6 hits and the fourth
 	// constraint
-	private void checkConflicts(Puzzle puzzle,
-			Hit n1, Hit n2,
-			Hit n3, Hit n4,
-			Hit n5, Hit n6,
-			Constraint c4,
-			List<Result> results) {
+	private Optional<Result> checkConflicts(Puzzle puzzle,
+			Hit h1, Hit h2,
+			Hit h3, Hit h4,
+			Hit h5, Hit h6,
+			Constraint c4) {
 
+		Optional<Result> result = Optional.empty();
+		
 		// check the constraints on the first 3 corners - see if (n1,n2) align with
 		// (n3,n4) and (n3,n4) align with (n5,n6)
-		if (!n1.getCandidate().hits(n3.getCandidate()) ||
-			!n2.getCandidate().hits(n4.getCandidate()) ||
-			!n3.getCandidate().hits(n5.getCandidate()) ||
-			!n4.getCandidate().hits(n6.getCandidate())) {
+		if (!h1.getCandidate().hits(h3.getCandidate()) ||
+			!h2.getCandidate().hits(h4.getCandidate()) ||
+			!h3.getCandidate().hits(h5.getCandidate()) ||
+			!h4.getCandidate().hits(h6.getCandidate())) {
 			// nope, so these aren't three corners of a rectangle
-			return;
+			return Optional.empty();
 		}
 
-		// OK, try to find (r7 and r8) to complete the fourth corner of the rectangle -
-		// they need to line up with (n1, n2) and (n5,n6)
-		for (Hit n7 = c4.getHead().getDown();
-				n7 != c4.getHead();
-				n7 = n7.getDown()) {
-			for (Hit n8 = n7.getDown();
-					n8 != c4.getHead();
-					n8 = n8.getDown()) {
-				// check n7 and n8 aren't the same candidates as any of the n1-n6
-				if (n7.getCandidate() == n1.getCandidate() ||
-					n7.getCandidate() == n2.getCandidate() ||
-					n7.getCandidate() == n3.getCandidate() ||
-					n7.getCandidate() == n4.getCandidate() ||
-					n7.getCandidate() == n5.getCandidate() ||
-					n7.getCandidate() == n6.getCandidate())
+		// OK, try to find (h7 and h8) to complete the fourth corner of the rectangle -
+		// they need to line up with (h1, h2) and (h5,h6)
+		for (Hit h7 = c4.getHead().getDown();
+				h7 != c4.getHead();
+				h7 = h7.getDown()) {
+			for (Hit h8 = h7.getDown();
+					h8 != c4.getHead();
+					h8 = h8.getDown()) {
+				// check h7 and h8 aren't hits of the same candidate as any of the h1-h6
+				if (h7.getCandidate() == h1.getCandidate() ||
+					h7.getCandidate() == h2.getCandidate() ||
+					h7.getCandidate() == h3.getCandidate() ||
+					h7.getCandidate() == h4.getCandidate() ||
+					h7.getCandidate() == h5.getCandidate() ||
+					h7.getCandidate() == h6.getCandidate())
 					continue;
-				if (n8.getCandidate() == n1.getCandidate() ||
-					n8.getCandidate() == n2.getCandidate() ||
-					n8.getCandidate() == n3.getCandidate() ||
-					n8.getCandidate() == n4.getCandidate() ||
-					n8.getCandidate() == n5.getCandidate() ||
-					n8.getCandidate() == n6.getCandidate())
+				if (h8.getCandidate() == h1.getCandidate() ||
+					h8.getCandidate() == h2.getCandidate() ||
+					h8.getCandidate() == h3.getCandidate() ||
+					h8.getCandidate() == h4.getCandidate() ||
+					h8.getCandidate() == h5.getCandidate() ||
+					h8.getCandidate() == h6.getCandidate())
 					continue;
 				
 				// check intersection constraints
-				if (isFourthCorner(n1, n2, n5, n6, n7, n8)) {
+				if (isFourthCorner(h1, h2, h5, h6, h7, h8)) {
 					// intersection constraints OK, check for other constraints that
 					// could force a unique configuration
-					checkOutsideConstraints(puzzle,
-							n1, n2, n3, n4, n5, n6, n7, n8,
-							results);
-				} else if (isFourthCorner(n1, n2, n5, n6, n8, n7)) {
+					result = checkOutsideConstraints(puzzle,
+							h1, h2, h3, h4, h5, h6, h7, h8);
+				} else if (isFourthCorner(h1, h2, h5, h6, h8, h7)) {
 					// intersection constraints OK, check for other constraints that
 					// could force a unique configuration
-					checkOutsideConstraints(puzzle,
-							n1, n2, n3, n4, n5, n6, n8, n7,
-							results);
+					result = checkOutsideConstraints(puzzle,
+							h1, h2, h3, h4, h5, h6, h8, h7);
 					
 				}
+				if (result.isPresent())
+					return result;
 			}
 		}
+		return Optional.empty();
 	}
 
-	// returns true if (r7,r8) align with (n1,n2) and (n5,n6), so that it is the
+	// returns true if (h7,h8) align with (h1,h2) and (h5,h6), so that it is the
 	// fourth corner of a rectangle
-	private boolean isFourthCorner(Hit n1, Hit n2,
-			Hit n5, Hit n6,
-			Hit r7, Hit r8) {
+	private boolean isFourthCorner(Hit h1, Hit h2,
+			Hit h5, Hit h6,
+			Hit h7, Hit h8) {
 
-		return (n5.getCandidate().hits(r7.getCandidate()) &&
-				r7.getCandidate().hits(n1.getCandidate()) &&
-				n6.getCandidate().hits(r8.getCandidate()) &&
-				r8.getCandidate().hits(n2.getCandidate()));
+		return (h5.getCandidate().hits(h7.getCandidate()) &&
+				h7.getCandidate().hits(h1.getCandidate()) &&
+				h6.getCandidate().hits(h8.getCandidate()) &&
+				h8.getCandidate().hits(h2.getCandidate()));
 	}
 	
 	// Check that any constraint on these candidates hits exactly two of them
 	// and so is useless in eliminating one of the two possible configurations
-	private void checkOutsideConstraints(Puzzle puzzle,
-			Hit n1, Hit n2,
-			Hit n3, Hit n4,
-			Hit n5, Hit n6,
-			Hit r7, Hit r8,
-			List<Result> results) {
+	private Optional<Result> checkOutsideConstraints(Puzzle puzzle,
+			Hit h1, Hit h2,
+			Hit h3, Hit h4,
+			Hit h5, Hit h6,
+			Hit h7, Hit h8) {
 		
 		// We create a set, then for each hit by the 8 candidates, if it's not
 		// in the set we add it, if it is in the set, we remove it. When we're done,
 		// the set should be empty.
-		Set<Constraint> colSet = new HashSet<Constraint>();
-		checkOutsideConstraints(colSet, n1.getCandidate());
-		checkOutsideConstraints(colSet, n2.getCandidate());
-		checkOutsideConstraints(colSet, n3.getCandidate());
-		checkOutsideConstraints(colSet, n4.getCandidate());
-		checkOutsideConstraints(colSet, n5.getCandidate());
-		checkOutsideConstraints(colSet, n6.getCandidate());
-		checkOutsideConstraints(colSet, r7.getCandidate());
-		checkOutsideConstraints(colSet, r8.getCandidate());
-		if (colSet.size() > 0)
-			return;
+		Set<Constraint> constraintSet = new HashSet<Constraint>();
+		checkOutsideConstraints(constraintSet, h1.getCandidate());
+		checkOutsideConstraints(constraintSet, h2.getCandidate());
+		checkOutsideConstraints(constraintSet, h3.getCandidate());
+		checkOutsideConstraints(constraintSet, h4.getCandidate());
+		checkOutsideConstraints(constraintSet, h5.getCandidate());
+		checkOutsideConstraints(constraintSet, h6.getCandidate());
+		checkOutsideConstraints(constraintSet, h7.getCandidate());
+		checkOutsideConstraints(constraintSet, h8.getCandidate());
+		if (constraintSet.size() > 0)
+			return Optional.empty();
 			
 		// bingo! if either r7 or r8 are in the solution, then it is not unique
 		LOG.info("Found {}unique rectangle at {}({},{}), {}({}, {}), {}({}, {}), {}({}, {}) - removing last pair of candidates",
 				limitToCells ? "" : "hidden ",
-				n1.getConstraint().getName(), n1.getCandidate().getName(), n2.getCandidate().getName(),
-				n3.getConstraint().getName(), n3.getCandidate().getName(), n4.getCandidate().getName(),
-				n5.getConstraint().getName(), n5.getCandidate().getName(), n6.getCandidate().getName(),
-				r7.getConstraint().getName(), r7.getCandidate().getName(), r8.getCandidate().getName());
+				h1.getConstraint().getName(), h1.getCandidate().getName(), h2.getCandidate().getName(),
+				h3.getConstraint().getName(), h3.getCandidate().getName(), h4.getCandidate().getName(),
+				h5.getConstraint().getName(), h5.getCandidate().getName(), h6.getCandidate().getName(),
+				h7.getConstraint().getName(), h7.getCandidate().getName(), h8.getCandidate().getName());
 		
-		results.add(new CandidateRemovedResult(puzzle, r7.getCandidate(),
+		HintBuilder hints = new HintBuilder();
+		hints.addText("There is a Hidden Unique Rectangle ...")
+				.newHint()
+				.addText("Check out the cells ")
+				.addHintRef(CELL_NAME, h1, HIGHLIGHT_GREEN).addText(", ")
+				.addHintRef(CELL_NAME, h3, HIGHLIGHT_GREEN).addText(", ")
+				.addHintRef(CELL_NAME, h5, HIGHLIGHT_GREEN).addText(" and ")
+				.addHintRef(CELL_NAME, h6, HIGHLIGHT_GREEN).addText(" ... ")
+				.newHint()
+				.addText("If ").addHintRef(CANDIDATE_NAME, h7, HIGHLIGHT_YELLOW)
+				.addText(" or ").addHintRef(CANDIDATE_NAME, h8, HIGHLIGHT_YELLOW)
+				.addText(" were in the solution then the rectangle with ")
+				.addHintRef(CELL_NAME, h1, HIGHLIGHT_GREEN).addText(", ")
+				.addHintRef(CELL_NAME, h3, HIGHLIGHT_GREEN).addText(" and ")
+				.addHintRef(CELL_NAME, h5, HIGHLIGHT_GREEN)
+				.addText(" could be completed in two different ways, so the puzzle ")
+				.addText("would not have a unique solution.");
+		
+		List<Action> actions = new ArrayList<>();
+		actions.add(new CandidateRemovedAction(puzzle, h7,
 				String.format("uniqueness constraint with (%s,%s), (%s, %s), (%s, %s)",
-						n1.getCandidate().getName(), n2.getCandidate().getName(),
-						n3.getCandidate().getName(), n4.getCandidate().getName(),
-						n5.getCandidate().getName(), n6.getCandidate().getName())
+						h1.getCandidate().getName(), h2.getCandidate().getName(),
+						h3.getCandidate().getName(), h4.getCandidate().getName(),
+						h5.getCandidate().getName(), h6.getCandidate().getName())
 				));
-		results.add(new CandidateRemovedResult(puzzle, r8.getCandidate(),
+		actions.add(new CandidateRemovedAction(puzzle, h8,
 				String.format("uniqueness constraint with (%s,%s), (%s, %s), (%s, %s)",
-						n1.getCandidate().getName(), n2.getCandidate().getName(),
-						n3.getCandidate().getName(), n4.getCandidate().getName(),
-						n5.getCandidate().getName(), n6.getCandidate().getName())
+						h1.getCandidate().getName(), h2.getCandidate().getName(),
+						h3.getCandidate().getName(), h4.getCandidate().getName(),
+						h5.getCandidate().getName(), h6.getCandidate().getName())
 				));
+		
+		Result result = new Result(hints.getHints(), hints.getMarkups(), actions);
+		return Optional.of(result);
 	}
 	
-	private void checkOutsideConstraints(Set<Constraint> set, Candidate r) {
-		Hit n = r.getFirstHit();
+	private void checkOutsideConstraints(Set<Constraint> set, Candidate c) {
+		Hit h = c.getFirstHit();
 		do {
-			if (set.contains(n.getConstraint()))
-				set.remove(n.getConstraint());
+			if (set.contains(h.getConstraint()))
+				set.remove(h.getConstraint());
 			else
-				set.add(n.getConstraint());
-			n = n.getRight();
+				set.add(h.getConstraint());
+			h = h.getRight();
 		}
-		while (n != r.getFirstHit());
+		while (h != c.getFirstHit());
 	}
 }

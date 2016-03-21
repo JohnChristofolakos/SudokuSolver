@@ -229,7 +229,9 @@ public class Main extends Application {
 		}
 		
 		// let the controller take over
-		SudokuController controller = new SudokuController(puzzle, solver, view.getControllerPane());
+		SudokuController controller = new SudokuController(puzzle, solver,
+				view.getControllerPane(),
+				view.getHintsMarkupGC());
 		controller.start();
 	}
 }

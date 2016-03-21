@@ -11,8 +11,6 @@ import jc.dlx.diagram.IColumn;
 import jc.dlx.diagram.IDiagram;
 import jc.dlx.diagram.INode;
 import jc.dlx.diagram.IRow;
-import jc.sudoku.puzzle.Candidate;
-
 import static java.util.stream.Collectors.toList;
 
 // Diagram representing a Sudoku problem in set cover form. After Donald E. Knuth,
