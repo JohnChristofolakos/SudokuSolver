@@ -17,15 +17,15 @@ Future work will include adding controllers to:
 
 Here is a screen shot of the solver hinting one of trickier patterns.
 
-![The Solver finds a Swordfish!][https://github.com/JohnChristofolakos/SudokuSolver/blob/master/screenshot.jpg]
+![The Solver finds a Swordfish!](https://github.com/JohnChristofolakos/SudokuSolver/blob/master/screenshot.jpg?raw=true)
 
-Credit is due to Andrew Stuart's excellent [website][www.sudokuwiki.org] for the inspiration and an excellent catalog of Sudoku solving strategies.
+Credit is due to Andrew Stuart's excellent [website](www.sudokuwiki.org) for inspiration and an excellent catalog of Sudoku solving strategies.
 
 
 ## References
 
-1. [Donald E. Knuth, 2000. Dancing Links][http://arxiv.org/abs/cs/0011047].
+1. [Donald E. Knuth, 2000. Dancing Links](http://arxiv.org/abs/cs/0011047).
 
-2. [Donald E. Knuth, undated program 'dance.w'][http://www-cs-faculty.stanford.edu/~uno/programs/dance.w].
+2. [Donald E. Knuth, undated program 'dance.w'](http://www-cs-faculty.stanford.edu/~uno/programs/dance.w).
 
-3. [Yuchen Zhang, undated, The Application of Exact Cover to the Creating of Sudoku Puzzle][http://www.math.utah.edu/~yzhang/teaching/1030/Sudoku.pdf].
+3. [Yuchen Zhang, undated, The Application of Exact Cover to the Creating of Sudoku Puzzle](http://www.math.utah.edu/~yzhang/teaching/1030/Sudoku.pdf).
