@@ -17,9 +17,9 @@ Future work will include adding controllers to:
 
 Here is a screen shot of the solver hinting one of trickier patterns.
 
-![The Solver finds a Swordfish!](https://github.com/JohnChristofolakos/SudokuSolver/blob/master/screenshot.jpg?raw=true)
+![The Solver finds a Swordfish!](screenshot.jpg?raw=true)
 
-Credit is due to Andrew Stuart's excellent [website](www.sudokuwiki.org) for inspiration and an excellent catalog of Sudoku solving strategies.
+Credit is due to Andrew Stuart's excellent [website](http://www.sudokuwiki.org) for inspiration and an excellent catalog of Sudoku solving strategies.
 
 
 ## References
