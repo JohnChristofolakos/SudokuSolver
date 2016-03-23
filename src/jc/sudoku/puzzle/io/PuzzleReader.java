@@ -3,6 +3,7 @@ package jc.sudoku.puzzle.io;
 import java.util.ArrayList;
 import java.util.List;
 
+import jc.sudoku.puzzle.Candidate;
 import jc.sudoku.puzzle.Constraint;
 import jc.sudoku.puzzle.Puzzle;
 
@@ -21,6 +22,14 @@ import static jc.sudoku.main.Utils.panic;
 // contain the entire diagram. Otherwise, rows should contain 9
 // characters - either a digit if the cell is a hint, or a '.' to
 // indicate a cell to be solved.
+//
+// Concrete subclasses must also implement the inputCandidiate method.
+// This is used to set up a precise puzzle position, used primarily
+// to test the solver. After the puzzle rows have been read, inputCandidate
+// will be called repeatedly. Each call should return the name of a
+// candidate to be eliminated from the diagram, for example r0c1d2 to
+// eliminate candidate 2 from row 0, column 1. When no more candidates are
+// to be eliminated, inputCandidiate should return null.
 //
 public abstract class PuzzleReader {
 	// things to cover
@@ -145,7 +154,7 @@ public abstract class PuzzleReader {
 		// populate the constraint names
 		generateConstraints(puzzle);
 		
-		// populate the candidates for to each cell
+		// populate the candidates for each cell
 		for (int c = 0; c < 9; c++)
 			for (int r = 0; r < 9; r++)
 				generateCandidates(puzzle, c, r);
@@ -156,8 +165,20 @@ public abstract class PuzzleReader {
 			for (int r = 0; r < 9; r++)
 				if (board[r][c] != 0)
 					puzzle.addHint("r" + r + "c" + c + "d" + board[r][c]);
+		
+		// see if we have any candidiates to eliminate
+		String name;
+		while ((name = inputCandidate()) != null) {
+			for (Candidate c : puzzle.getActiveCandidates()) {
+				if (c.getName().equals(name))
+					puzzle.eliminateCandidate(c);
+			}
+		}
 	}
 	
-	// To be implemented by the concrete subclasses
+	// Reads the next row of puzzle input
 	public abstract String inputRow(int r);
+	
+	// Reads the next candidiate to be eliminated from the initial puzzle
+	public abstract String inputCandidate();
 }

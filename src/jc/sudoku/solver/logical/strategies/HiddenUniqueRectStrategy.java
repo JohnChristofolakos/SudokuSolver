@@ -115,31 +115,31 @@ public class HiddenUniqueRectStrategy implements Strategy {
 						// constraints given above we need to try col4 diagonally
 						// opposite to each of the other three
 						if (!result.isPresent())
-							checkConflicts(puzzle, h1, h2, h3, h4, h5, h6, c4);	// 135x and 246x
+							result = checkConflicts(puzzle, h1, h2, h3, h4, h5, h6, c4);	// 135x and 246x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h1, h2, h3, h4, h6, h5, c4);	// 136x and 245x
+							result = checkConflicts(puzzle, h1, h2, h3, h4, h6, h5, c4);	// 136x and 245x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h1, h2, h4, h3, h5, h6, c4);	// 145x and 236x
+							result = checkConflicts(puzzle, h1, h2, h4, h3, h5, h6, c4);	// 145x and 236x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h1, h2, h4, h3, h6, h5, c4);	// 146x and 235x
+							result = checkConflicts(puzzle, h1, h2, h4, h3, h6, h5, c4);	// 146x and 235x
 						
 						if (!result.isPresent())
-							checkConflicts(puzzle, h3, h4, h1, h2, h5, h6, c4);	// 315x and 426x
+							result = checkConflicts(puzzle, h3, h4, h1, h2, h5, h6, c4);	// 315x and 426x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h3, h4, h1, h2, h6, h5, c4);	// 316x and 425x
+							result = checkConflicts(puzzle, h3, h4, h1, h2, h6, h5, c4);	// 316x and 425x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h4, h3, h1, h2, h5, h6, c4);	// 415x and 326x
+							result = checkConflicts(puzzle, h4, h3, h1, h2, h5, h6, c4);	// 415x and 326x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h4, h3, h1, h2, h6, h5, c4);	// 416x and 325x
+							result = checkConflicts(puzzle, h4, h3, h1, h2, h6, h5, c4);	// 416x and 325x
 
 						if (!result.isPresent())
-							checkConflicts(puzzle, h1, h2, h5, h6, h3, h4, c4);	// 153x and 264x
+							result = checkConflicts(puzzle, h1, h2, h5, h6, h3, h4, c4);	// 153x and 264x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h1, h2, h6, h5, h3, h4, c4);	// 163x and 254x
+							result = checkConflicts(puzzle, h1, h2, h6, h5, h3, h4, c4);	// 163x and 254x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h1, h2, h5, h6, h4, h3, c4);	// 154x and 263x
+							result = checkConflicts(puzzle, h1, h2, h5, h6, h4, h3, c4);	// 154x and 263x
 						if (!result.isPresent())
-							checkConflicts(puzzle, h1, h2, h6, h5, h4, h3, c4);	// 164x and 253x
+							result = checkConflicts(puzzle, h1, h2, h6, h5, h4, h3, c4);	// 164x and 253x
 
 						// these are susceptible to being 'found' twice if we
 						// continue, so get out after the first one is found
@@ -260,7 +260,8 @@ public class HiddenUniqueRectStrategy implements Strategy {
 				h7.getConstraint().getName(), h7.getCandidate().getName(), h8.getCandidate().getName());
 		
 		HintBuilder hints = new HintBuilder();
-		hints.addText("There is a Hidden Unique Rectangle ...")
+		hints.addText(String.format("There is a %sUnique Rectangle ...",
+								limitToCells ? "" : "Hidden "))
 				.newHint()
 				.addText("Check out the cells ")
 				.addHintRef(CELL_NAME, h1, HIGHLIGHT_GREEN).addText(", ")

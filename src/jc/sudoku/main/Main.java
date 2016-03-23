@@ -183,6 +183,7 @@ public class Main extends Application {
 		else {
 			// generate the puzzle
 			reader.generate(puzzle);
+			reader = null;
 			
 			// create and invoke the specified solver
 			if (solverKnuth) {
@@ -229,6 +230,7 @@ public class Main extends Application {
 		}
 		
 		// let the controller take over
+		reader = null;
 		SudokuController controller = new SudokuController(puzzle, solver,
 				view.getControllerPane(),
 				view.getHintsMarkupGC());

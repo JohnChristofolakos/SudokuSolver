@@ -2,14 +2,21 @@ package jc.sudoku.logical.solver.test;
 
 import static org.junit.Assert.*;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jc.dlx.solver.DlxSolver;
 import jc.sudoku.solver.logical.LogicalSolver;
+import jc.sudoku.solver.logical.Result;
 import jc.sudoku.main.Puzzles;
 import jc.sudoku.puzzle.Puzzle;
+import jc.sudoku.puzzle.action.impl.CandidateRemovedAction;
 import jc.sudoku.puzzle.io.PuzzleStringReader;
 
 public class LogicalSolverTest {
@@ -75,7 +82,7 @@ public class LogicalSolverTest {
 			fail("Diagram is blocked - probably a bug in the strategies");
 	}
 	
-	@Test
+	@Ignore
 	public final void test() {
 		long startTime = System.currentTimeMillis();
 		
@@ -89,7 +96,7 @@ public class LogicalSolverTest {
 				System.currentTimeMillis() - startTime);
 	}
 
-	@Test
+	@Ignore
 	public final void testStreamed() {
 		long startTime = System.currentTimeMillis();
 		
@@ -100,6 +107,54 @@ public class LogicalSolverTest {
 		}
 		
 		System.out.format("Streamed solver finished in %d millis\n",
+				System.currentTimeMillis() - startTime);
+	}
+	
+	@Test
+	public final void testUniqueRect() {
+		long startTime = System.currentTimeMillis();
+		
+		// get the basic grid
+		String[] puzzleString = Puzzles.getPuzzle("uniqueRect");
+		assertNotNull(puzzleString);
+		
+		// convert to list, add candidiate eliminations until we get to
+		// the point where the unique rectangle is next up, convert back to array
+		List<String> puzzleList = new ArrayList<>();
+		for (String s : puzzleString)
+			puzzleList.add(s);
+		puzzleList.add(new String("r1c8d2"));
+		puzzleList.add(new String("r2c0d9"));
+		puzzleList.add(new String("r2c1d9"));
+		puzzleList.add(new String("r2c8d2"));
+		puzzleList.add(new String("r2c8d9"));
+		puzzleList.add(new String("r8c1d3"));
+		puzzleList.add(new String("r2c6d4"));
+		puzzleList.add(new String("r2c8d4"));
+		puzzleString = puzzleList.toArray(new String[puzzleList.size()]);
+		
+		Puzzle puzzle = new Puzzle();
+		PuzzleStringReader reader = new PuzzleStringReader(puzzleString);
+		reader.read();
+		reader.generate(puzzle);
+		reader = null;
+		
+		LogicalSolver solver = new LogicalSolver(puzzle, false);
+		Optional<Result> result = solver.findStrategy();
+		assertTrue(result.isPresent());
+		assertEquals("There is a Unique Rectangle ...", result.get().hints.get(0));
+		assertEquals(2, result.get().actions.size());
+		assertTrue(result.get().actions.get(0) instanceof CandidateRemovedAction);
+		CandidateRemovedAction act = (CandidateRemovedAction) result.get().actions.get(0);
+		assertEquals(0, act.getCandidate().getColumn());
+		assertEquals(3, act.getCandidate().getRow());
+		assertEquals(2, act.getCandidate().getDigit());
+		act = (CandidateRemovedAction) result.get().actions.get(1);
+		assertEquals(0, act.getCandidate().getColumn());
+		assertEquals(3, act.getCandidate().getRow());
+		assertEquals(9, act.getCandidate().getDigit());
+		
+		System.out.format("Unique rectangle detected in %d millis\n",
 				System.currentTimeMillis() - startTime);
 	}
 }

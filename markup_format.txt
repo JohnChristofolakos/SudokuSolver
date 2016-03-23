@@ -1,0 +1,10 @@
+$d - candidate digit
+$n - candidate name
+$s - cellname
+$t - unit type
+$u - unit name name
+$z - unit type plural
+
+
+$c - column name
+$r - row name

@@ -14,7 +14,7 @@ import java.util.ArrayList;
 // Diagram representing a Sudoku problem in set cover form. 
 //
 // To initialise this class, call addColumn for each column in the matrix,
-// the call addRow for each row. Depending on the usage, the client can add
+// then call addRow for each row. Depending on the usage, the client can add
 // all possible rows and columns, then specify a number of 'solved' rows by
 // calling addHint. Or the hinted cells can be accounted for during the
 // initial construction of the diagram, as the original Knuth algorithm does.
