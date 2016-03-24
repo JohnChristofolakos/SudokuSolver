@@ -1,0 +1,58 @@
+/* 
+    Document   : Undecorator
+    Created on : Dec 19, 2014
+    Author     : In-SideFX
+    Description:
+        Demo app purpose
+*/
+.clientarea-background{
+    -fx-background-color: #ffffff;
+}
+/*
+    The Stage background.
+    Currently a Rectangle node
+*/
+.decoration-background{
+    -fx-fill: #ffffff;
+    -fx-stroke-width: 0;
+    -fx-arc-width:20px;
+    -fx-arc-height:20px;
+}
+/*
+    Defines the rectangle responsible for the shadow
+*/
+.decoration-shadow{
+    -fx-fill: black;
+    -fx-stroke-width: 0;
+    -fx-arc-width:20px;
+    -fx-arc-height:20px;
+}
+/*
+ Used to declare the definition of stage resize zone
+*/
+.decoration-resize{
+    -fx-fill:null;  /* avoid mouse events in the middle*/
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-insets: 0;
+}
+
+.decoration-button-menu{
+	-fx-scale-x: 1.5;
+	-fx-scale-y: 1.5;
+	-fx-translate-x: 20;
+	-fx-translate-y: 15;
+	-fx-padding: 0, 0, 0, 10;
+}
+
+.decoration-button-menu:hover{
+	-fx-scale-x: 1.5;
+	-fx-scale-y: 1.5;
+	-fx-translate-x: 20;
+	-fx-translate-y: 15;
+	-fx-padding: 0, 0, 0, 10;
+}
+#TitleLabel{
+	-fx-text: "SudokuSolver";
+	-fx-effect: none;
+}

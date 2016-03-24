@@ -3,16 +3,20 @@ package jc.sudoku.view;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import insidefx.undecorator.Undecorator;
+import insidefx.undecorator.UndecoratorScene;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.VPos;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
@@ -46,10 +50,20 @@ public class SudokuView implements PuzzleListener {
 	
 	public void start() {
 		try {
+			// setup the root region
 			BorderPane root = new BorderPane();
 			root.setBackground(new Background(PANEL_FILL));
-			Scene scene = new Scene(root, GRID_WIDTH + CONTROLLER_WIDTH + GRID_PAD, GRID_HEIGHT);
-
+			root.setMinWidth(GRID_WIDTH + CONTROLLER_WIDTH + GRID_PAD);
+			root.setMinHeight(MENU_HEIGHT + GRID_HEIGHT);
+			root.setMaxWidth(GRID_WIDTH + CONTROLLER_WIDTH + GRID_PAD);
+			root.setMaxHeight(MENU_HEIGHT + GRID_HEIGHT);
+			
+			Region menuRegion = new Region();
+			menuRegion.setPickOnBounds(false);
+			menuRegion.setMinHeight(MENU_HEIGHT);
+			root.setTop(menuRegion);
+			
+	        // set up the grid pane
 			StackPane gridStack = new StackPane();
 			gridStack.setBackground(new Background(PANEL_FILL));
 			gridStack.setMinWidth(GRID_WIDTH + GRID_PAD);
@@ -73,7 +87,6 @@ public class SudokuView implements PuzzleListener {
 			reader.generate(puzzle);
 
 			// setup the controller pane 
-			
 			controllerPane = new AnchorPane();
 			controllerPane.setPadding(new Insets(CONTROLLER_PAD));
 			controllerPane.setMinHeight(CONTROLLER_HEIGHT);
@@ -85,8 +98,19 @@ public class SudokuView implements PuzzleListener {
 			root.setLeft(gridStack);
 			root.setRight(controllerPane);
 			
+	        final UndecoratorScene undecoratorScene = new UndecoratorScene(primaryStage, root);
+	        undecoratorScene.addStylesheet("scene.css");
+	        primaryStage.setScene(undecoratorScene);
+			primaryStage.setTitle("SudokuSolver");
+	        primaryStage.sizeToScene();
+	        primaryStage.toFront();
+
+	        // Set minimum size based on client area's minimum sizes
+	        Undecorator undecorator = undecoratorScene.getUndecorator();
+	        primaryStage.setMinWidth(undecorator.getMinWidth());
+	        primaryStage.setMinHeight(undecorator.getMinHeight());
+
 			// show the main window
-			primaryStage.setScene(scene);
 			primaryStage.show();
 			
 		} catch(Exception e) {
@@ -94,7 +118,7 @@ public class SudokuView implements PuzzleListener {
 			Platform.exit();
 		}
 	}
-
+	
 	public static int getCellPosition(int row) {
 		return GRID_PAD + (row * (CELL_SIZE + CELL_PAD_SMALL)) +
 				((row / 3) * (CELL_PAD_LARGE - CELL_PAD_SMALL));

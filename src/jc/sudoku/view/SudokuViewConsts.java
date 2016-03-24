@@ -1,7 +1,5 @@
 package jc.sudoku.view;
 
-import static jc.sudoku.view.SudokuViewConsts.BUTTONBAR_COLOR;
-
 import javafx.geometry.Insets;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
@@ -12,6 +10,8 @@ import javafx.scene.text.FontPosture;
 import javafx.scene.text.FontWeight;
 
 public class SudokuViewConsts {
+	public static final int MENU_HEIGHT = 40;
+	
 	public final static int CELL_SIZE = 60;
 	public final static int CELL_PAD_SMALL = 8;
 	public final static int CELL_PAD_LARGE = 16;
@@ -99,7 +99,8 @@ public class SudokuViewConsts {
 	public final static Color HIGHLIGHT_ORANGE = new Color(1.0f, 0.65f, 0.0f, 0.5f);
 
 	public final static BackgroundFill[] PANEL_FILL = { new BackgroundFill(Color.WHITE,
-			null, null) };
+			new CornerRadii(5.0, true),
+			null ) };
 	public final static Background PANEL_BACKGROUND = new Background(PANEL_FILL);
 	
 	public final static BackgroundFill[] GRID_FILL = { new BackgroundFill(GRID_COLOR,
